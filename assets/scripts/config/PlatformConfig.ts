@@ -31,7 +31,8 @@ export const WECHAT_CONFIG: PlatformReleaseConfig = {
         interstitial: '',
     },
     shareTemplateId: '',
-    shareImageUrl: '',
+    // 包内默认分享图（build-templates/wechatgame/share.png，构建时拷贝到包根目录）；结算页分享会用动态生成的成绩卡片覆盖
+    shareImageUrl: 'share.png',
 };
 
 export const DOUYIN_CONFIG: PlatformReleaseConfig = {

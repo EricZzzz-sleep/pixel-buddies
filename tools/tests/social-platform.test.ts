@@ -122,7 +122,7 @@ test('微信适配：能力检测、存储、分享只报告“已打开面板�
     assert.equal(a.storage.getItem('k'), 'v');
     const r = await a.share({ title: 't', query: 'pb=1' });
     assert.equal(r.status, 'opened');
-    assert.deepEqual(calls[0], { title: 't', query: 'pb=1' }, '未配置分享图时不传占位图');
+    assert.deepEqual(calls[0], { title: 't', query: 'pb=1', imageUrl: 'share.png' }, '使用包内默认分享图；未配置 imageUrlId 时不传');
     a.setPassiveShare(() => ({ title: 'x', query: '' })); // 缺少接口时静默跳过
     a.vibrateShort();
 });

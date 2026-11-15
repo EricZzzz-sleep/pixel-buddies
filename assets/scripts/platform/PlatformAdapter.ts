@@ -62,6 +62,8 @@ export interface Capabilities {
     rewardedAd: boolean;
     interstitialAd: boolean;
     chooseImage: boolean;
+    /** 能把 2D 绘制结果导出为本地图片作为分享图 */
+    shareImage: boolean;
 }
 
 export interface RewardedAdResult {
@@ -120,6 +122,12 @@ export interface PlatformAdapter {
     /** 读取剪贴板文本（用于粘贴挑战码）；不支持或被拒绝时返回 null */
     getClipboard(): Promise<string | null>;
     vibrateShort(): void;
+
+    /**
+     * 用 Canvas 2D 绘制分享图并导出为本地临时文件路径；不支持或失败时返回 null（分享时改用平台默认图）。
+     * draw 收到的是标准 2D 上下文。
+     */
+    renderShareImage(draw: (ctx: any) => void, width: number, height: number): string | null;
 
     /** 广告位为空或平台不支持时返回 null */
     createRewardedAd(adUnitId: string): RewardedAdHandle | null;

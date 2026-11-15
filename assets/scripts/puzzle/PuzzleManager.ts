@@ -37,6 +37,7 @@ export class PuzzleManager {
     private _hintsUsed = 0;
     private _peekCount = 0;
     private _undoCount = 0;
+    private _bonusHints = 0;
     private _finished = false;
     private undoStack: Array<[number, number]> = [];
 
@@ -59,7 +60,7 @@ export class PuzzleManager {
         return this._hintsUsed;
     }
     get hintsLeft(): number {
-        return Math.max(0, DIFFICULTIES[this.spec.grid].freeHints - this._hintsUsed);
+        return Math.max(0, DIFFICULTIES[this.spec.grid].freeHints + this._bonusHints - this._hintsUsed);
     }
     get peekCount(): number {
         return this._peekCount;
@@ -161,6 +162,11 @@ export class PuzzleManager {
             this.timer.start();
         }
         return pick;
+    }
+
+    /** 激励视频完整观看后发放 1 次额外提示（仅本局有效） */
+    grantExtraHint(count = 1): void {
+        if (!this._finished && count > 0) this._bonusHints += count;
     }
 
     /** 查看原图（不影响星级，单独计数） */

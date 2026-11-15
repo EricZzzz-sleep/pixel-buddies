@@ -8,7 +8,7 @@
     }
   ],
   "buildPath": "project://build",
-  "md5Cache": true,
+  "md5Cache": false,
   "sourceMaps": false,
   "platform": "wechatgame",
   "outputName": "wechatgame",

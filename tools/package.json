@@ -8,7 +8,8 @@
     "check:wechat-api": "tsc -p tsconfig.wxcompat.json",
     "verify": "npm run typecheck && npm run check:wechat-api && npm test",
     "art": "tsx render-art.ts",
-    "audio": "tsx gen-audio.ts"
+    "audio": "tsx gen-audio.ts",
+    "store-assets": "tsx render-store-assets.ts"
   },
   "devDependencies": {
     "@cocos/creator-types": "^3.8.8",

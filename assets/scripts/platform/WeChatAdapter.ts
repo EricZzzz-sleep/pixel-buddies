@@ -21,6 +21,7 @@ export class WeChatAdapter extends MiniGameAdapterBase {
         super(wx);
         this.wx = wx;
         this.capabilities.chooseImage = isFn(wx.chooseMedia);
+        this.capabilities.shareImage = isFn(wx.createCanvas);
     }
 
     protected windowInfo(): MGWindowInfo | null {
@@ -74,6 +75,24 @@ export class WeChatAdapter extends MiniGameAdapterBase {
         if (isFn(this.wx.onShareAppMessage)) {
             safeCall(() => this.wx.onShareAppMessage!(() => this.toWxShare(provider())), undefined, 'onShareAppMessage');
         }
+    }
+
+    /** 离屏 2D Canvas 绘制分享卡片 → toTempFilePathSync（微信官方 Canvas 接口） */
+    renderShareImage(draw: (ctx: any) => void, width: number, height: number): string | null {
+        if (!isFn(this.wx.createCanvas)) return null;
+        return safeCall(
+            () => {
+                const canvas = this.wx.createCanvas!();
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx || !isFn(canvas.toTempFilePathSync)) return null;
+                draw(ctx);
+                return canvas.toTempFilePathSync!({ x: 0, y: 0, width, height, destWidth: width, destHeight: height, fileType: 'png' }) || null;
+            },
+            null,
+            'renderShareImage',
+        );
     }
 
     vibrateShort(): void {

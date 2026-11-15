@@ -69,6 +69,7 @@ export interface MGCanvas {
     width: number;
     height: number;
     getContext(type: '2d'): any;
+    toTempFilePathSync?(opt: { x?: number; y?: number; width?: number; height?: number; destWidth?: number; destHeight?: number; fileType?: 'jpg' | 'png' }): string;
 }
 
 /** 微信小游戏 wx 子集 */

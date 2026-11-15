@@ -12,6 +12,8 @@ import { HomePage } from '../pages/HomePage';
 import { showIncomingChallenge } from '../pages/PageKit';
 import { ResultPage } from '../pages/ResultPage';
 import { SettingsPage } from '../pages/SettingsPage';
+import { WorkshopPage } from '../pages/WorkshopPage';
+import { PolicyPage } from '../pages/PolicyPage';
 import { createPlatformAdapter } from '../platform/PlatformFactory';
 import { PlatformAdapter } from '../platform/PlatformAdapter';
 import { hex, Theme } from '../ui/Theme';
@@ -63,6 +65,8 @@ export class GameRoot extends Component {
         this.sm.register(new CollectionPage(this.sm, 'collection'));
         this.sm.register(new SettingsPage(this.sm, 'settings'));
         this.sm.register(new ChallengePage(this.sm, 'challenge'));
+        this.sm.register(new WorkshopPage(this.sm, 'workshop'));
+        this.sm.register(new PolicyPage(this.sm, 'policy'));
 
         this.bindLifecycle(platform);
         this.gm.share.registerPassiveShare();

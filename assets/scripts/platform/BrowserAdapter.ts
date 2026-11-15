@@ -69,6 +69,7 @@ export class BrowserAdapter implements PlatformAdapter {
             rewardedAd: false,
             interstitialAd: false,
             chooseImage: !!(this.win && this.win.document),
+            shareImage: false,
         };
     }
 
@@ -166,6 +167,11 @@ export class BrowserAdapter implements PlatformAdapter {
         // 浏览器只允许在用户真实点击后振动，否则会在控制台报错
         if (nav && nav.userActivation && !nav.userActivation.hasBeenActive) return;
         if (nav && typeof nav.vibrate === 'function') safeCall(() => nav.vibrate(15), false, 'vibrate');
+    }
+
+    renderShareImage(): string | null {
+        // Web 分享是复制挑战码，不需要分享图
+        return null;
     }
 
     createRewardedAd(): RewardedAdHandle | null {

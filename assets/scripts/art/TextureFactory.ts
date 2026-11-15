@@ -4,6 +4,7 @@ import { pieceSourceRect } from '../puzzle/PuzzleGenerator';
 import { ICONS } from '../ui/PixelIcons';
 import { PixelCanvas } from './PixelCanvas';
 import { renderArt, renderMosaic } from './PuzzleArt';
+import { isCustomId } from './CustomArtStore';
 
 /**
  * 把像素缓冲转成 Cocos 纹理/精灵帧，并做缓存。
@@ -15,6 +16,8 @@ import { renderArt, renderMosaic } from './PuzzleArt';
 export class TextureFactory {
     private textures = new Map<string, Texture2D>();
     private frames = new Map<string, SpriteFrame>();
+    /** 像素工坊作品的像素来源（由 GameManager 注入） */
+    customProvider: ((id: string) => PixelCanvas | null) | null = null;
 
     /** 把 PixelCanvas 上传为纹理 */
     textureFromCanvas(key: string, c: PixelCanvas): Texture2D {
@@ -48,7 +51,13 @@ export class TextureFactory {
     /** 完整作品 */
     art(id: string): SpriteFrame {
         const key = `art:${id}`;
-        return this.frames.get(key) || this.frameFromCanvas(key, renderArt(id));
+        const cached = this.frames.get(key);
+        if (cached) return cached;
+        if (isCustomId(id) && this.customProvider) {
+            const c = this.customProvider(id);
+            if (c) return this.frameFromCanvas(key, c);
+        }
+        return this.frameFromCanvas(key, renderArt(id));
     }
 
     /** 未收集作品的马赛克预览 */

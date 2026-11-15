@@ -41,6 +41,17 @@ export interface ChallengeLog {
     kind?: 'sent' | 'received';
 }
 
+/** 像素工坊作品（照片转像素后的结果，只保存在本机） */
+export interface CustomWork {
+    id: string;
+    name: string;
+    createdAt: number;
+    /** 调色板：0xRRGGBB */
+    palette: number[];
+    /** 60×60 个调色板索引，base64 编码 */
+    pixels: string;
+}
+
 export interface Settings {
     music: boolean;
     sfx: boolean;
@@ -66,6 +77,10 @@ export interface SaveData {
     settings: Settings;
     tutorial: { puzzleBasics: boolean };
     player: { nickname: string; avatarId: number };
+    /** 像素工坊作品（最多 MAX_CUSTOM 张） */
+    custom: CustomWork[];
+    /** 玩家已确认的授权说明（例如使用相册前的隐私提示） */
+    consent: { photo: boolean };
 }
 
 export function createDefaultSave(now: number): SaveData {
@@ -83,6 +98,8 @@ export function createDefaultSave(now: number): SaveData {
         settings: { music: true, sfx: true, vibration: true },
         tutorial: { puzzleBasics: false },
         player: { nickname: '像素搭子', avatarId: 0 },
+        custom: [],
+        consent: { photo: false },
     };
 }
 
@@ -173,6 +190,12 @@ export function migrate(raw: unknown, now: number): SaveData | null {
         d.settings.vibration = bool(data.settings.vibration, true);
     }
     if (isObj(data.tutorial)) d.tutorial.puzzleBasics = bool(data.tutorial.puzzleBasics, false);
+    if (Array.isArray(data.custom)) {
+        d.custom = data.custom.filter(
+            (w: any) => isObj(w) && typeof w.id === 'string' && Array.isArray(w.palette) && typeof w.pixels === 'string',
+        );
+    }
+    if (isObj(data.consent)) d.consent.photo = bool(data.consent.photo, false);
     if (isObj(data.player)) {
         if (typeof data.player.nickname === 'string' && data.player.nickname) d.player.nickname = data.player.nickname.slice(0, 12);
         d.player.avatarId = num(data.player.avatarId, 0);

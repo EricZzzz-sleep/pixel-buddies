@@ -78,7 +78,10 @@ export class SettingsPage extends BasePage {
                     },
                 ]),
         }, bw / 2 + 10, y - 50);
-        y -= 130;
+        y -= 120;
+        button(this.root, { w: bw, h: 80, text: '隐私政策', fontSize: Theme.font.small, style: 'white', onClick: () => this.sm.go('policy', { tab: 'privacy' }) }, -bw / 2 - 10, y - 44);
+        button(this.root, { w: bw, h: 80, text: '用户协议', fontSize: Theme.font.small, style: 'white', onClick: () => this.sm.go('policy', { tab: 'agreement' }) }, bw / 2 + 10, y - 44);
+        y -= 116;
 
         const aboutH = Math.min(520, y - (-L.h / 2 + L.safeBottom + 20));
         const about = panel(this.root, W, aboutH, { fill: P.cream2, border: P.cream3, step: Theme.px, shadow: undefined }, 0, y - aboutH / 2);

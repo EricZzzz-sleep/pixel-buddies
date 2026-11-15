@@ -116,6 +116,7 @@ export abstract class MiniGameAdapterBase implements PlatformAdapter {
             rewardedAd: isFn(api.createRewardedVideoAd),
             interstitialAd: isFn(api.createInterstitialAd),
             chooseImage: false,
+            shareImage: false,
         };
     }
 
@@ -181,6 +182,10 @@ export abstract class MiniGameAdapterBase implements PlatformAdapter {
                 'setClipboardData',
             );
         });
+    }
+
+    renderShareImage(_draw: (ctx: any) => void, _width: number, _height: number): string | null {
+        return null;
     }
 
     getClipboard(): Promise<string | null> {

@@ -1,5 +1,6 @@
 import { Node, tween, Vec3 } from 'cc';
-import { ART_LIST, getArt } from '../art/ArtCatalog';
+import { ART_LIST } from '../art/ArtCatalog';
+import { isCustomId } from '../art/CustomArtStore';
 import { P } from '../art/Palette';
 import { DIFFICULTIES } from '../config/GameConfig';
 import { formatDuration } from '../core/GameTimer';
@@ -48,7 +49,7 @@ export class ResultPage extends BasePage {
         gm.save.flush();
 
         const L = this.L;
-        const art = getArt(result.imageId)!;
+        const art = gm.resolveArt(result.imageId)!;
         const W = L.w - Theme.gutter * 2;
         const c = this.content;
         const stars = rec.breakdown.stars;
@@ -78,7 +79,7 @@ export class ResultPage extends BasePage {
         const frame = artFrame(c, gm.textures.art(art.id), artSize, 0, artY, art.tint);
         frame.setScale(0.6, 0.6, 1);
         tween(frame).to(0.35, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' }).start();
-        if (rec.newlyCollected) {
+        if (rec.newlyCollected && !isCustomId(result.imageId)) {
             const badge = panel(c, 190, 52, { fill: P.mint2, border: P.ink, step: Theme.px, shadow: P.mint3 }, artSize / 2 - 10, artY + artSize / 2 - 26);
             label(badge, '新作品收藏', Theme.font.tiny, { bold: true });
             badge.angle = -8;
@@ -158,7 +159,7 @@ export class ResultPage extends BasePage {
             const d = daily;
             button(c, {
                 w: W, h: 100, text: '分享今日成绩', style: 'butter', icon: gm.textures.icon('share', P.ink),
-                onClick: () => gm.share.shareDailyResult(session.dateKey!, art.name, d.record.bestTimeMs, d.record.bestMoves, d.record.stars).then((r) => this.sm.toast(r.message)),
+                onClick: () => gm.share.shareDailyResult(session.dateKey!, art.name, d.record.bestTimeMs, d.record.bestMoves, d.record.stars, art.id).then((r) => this.sm.toast(r.message)),
             }, 0, btnY + 120);
         } else if (mode === 'challenge-accept' && session.challenge) {
             const back = gm.challenges.withResult(session.challenge, result);

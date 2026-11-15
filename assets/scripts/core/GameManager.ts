@@ -1,6 +1,8 @@
 import { AdManager } from '../ads/AdManager';
 import { Analytics } from '../analytics/Analytics';
 import { TextureFactory } from '../art/TextureFactory';
+import { CustomArtStore } from '../art/CustomArtStore';
+import type { ArtInfo } from '../art/ArtCatalog';
 import type { AudioManager } from '../audio/AudioManager';
 import { CollectionManager } from '../collection/CollectionManager';
 import { DailyChallengeManager } from '../daily/DailyChallengeManager';
@@ -70,6 +72,7 @@ export class GameManager {
     readonly ads: AdManager;
     readonly analytics = new Analytics();
     readonly textures = new TextureFactory();
+    readonly customArt: CustomArtStore;
     audio!: AudioManager;
     scene!: SceneManager;
     layout!: Layout;
@@ -81,8 +84,15 @@ export class GameManager {
         this.challenges = new ChallengeManager(this.save);
         this.share = new ShareManager(platform, this.challenges);
         this.ads = new AdManager(platform);
+        this.customArt = new CustomArtStore(this.save);
+        this.textures.customProvider = (id) => this.customArt.canvasOf(id);
         this.save.subscribe(() => this.events.emit('save:changed'));
         GameManager._inst = this;
+    }
+
+    /** 内置作品或像素工坊作品的信息 */
+    resolveArt(id: string): ArtInfo | undefined {
+        return this.customArt.resolve(id);
     }
 
     get settings() {

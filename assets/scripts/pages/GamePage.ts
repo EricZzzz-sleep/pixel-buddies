@@ -1,5 +1,4 @@
 import { BlockInputEvents, Graphics, Label, Node, tween, Tween, Vec3 } from 'cc';
-import { getArt } from '../art/ArtCatalog';
 import { P } from '../art/Palette';
 import { DIFFICULTIES } from '../config/GameConfig';
 import { formatDuration } from '../core/GameTimer';
@@ -58,7 +57,12 @@ export class GamePage extends BasePage {
         this.tagLabel.node.setPosition(0, L.headerY - 22);
 
         // HUD 三个数据块
-        const hudY = L.contentTop - 46;
+        // 纵向自适应：棋盘受宽度限制，高屏多出的空间平分到 HUD 上下，避免棋盘上下大块留白
+        const toolY = -L.h / 2 + L.safeBottom + 24 + 56;
+        const progY = toolY + 52 + 44;
+        const baseHud = L.contentTop - 46;
+        const spare = Math.max(0, baseHud - 38 - 24 - (progY + 48) - (W + 8));
+        const hudY = baseHud - spare * 0.3;
         const bw = (W - 24) / 3;
         const mk = (i: number, icon: string, color: number, fill: number) => {
             const p = panel(this.root, bw, 76, { fill, border: P.ink, shadow: P.ink, step: Theme.px, shadowDepth: 1 }, -W / 2 + bw / 2 + i * (bw + 12), hudY);
@@ -73,7 +77,6 @@ export class GamePage extends BasePage {
         this.goalLabel.fontSize = Theme.font.small;
 
         // 工具栏
-        const toolY = -L.h / 2 + L.safeBottom + 24 + 56;
         const tw = (W - 32) / 3;
         this.peekBtn = button(this.root, { w: tw, h: 104, text: '按住看原图', fontSize: Theme.font.small, style: 'sky', icon: gm.textures.icon('eye', P.blue3, P.white), iconSize: 40, iconTop: true }, -W / 2 + tw / 2, toolY);
         this.hintBtn = button(this.root, { w: tw, h: 104, text: '提示', fontSize: Theme.font.small, style: 'butter', icon: gm.textures.icon('bulb', P.gold2, P.white), iconSize: 40, iconTop: true, onClick: () => this.useHint() }, 0, toolY);
@@ -84,7 +87,6 @@ export class GamePage extends BasePage {
         this.peekBtn.node.on(Node.EventType.TOUCH_CANCEL, () => this.setPeek(false));
 
         // 进度条（工具栏上方）
-        const progY = toolY + 52 + 44;
         this.progressW = W;
         this.progressLabel = label(this.root, '', Theme.font.tiny, { color: P.ink2, bold: true, align: 'left' });
         this.progressLabel.node.setPosition(-W / 2, progY + 22);
@@ -120,7 +122,7 @@ export class GamePage extends BasePage {
         this.pm = new PuzzleManager(session.spec);
         this.board.start(this.pm);
         this.board.setEnabled(true);
-        const art = getArt(session.spec.imageId);
+        const art = this.gm.resolveArt(session.spec.imageId);
         this.titleLabel.string = art ? art.name : '像素拼图';
         const d = DIFFICULTIES[session.spec.grid];
         this.tagLabel.string = `${MODE_TAG[session.mode]} · ${d.label} ${d.desc}`;
@@ -198,7 +200,10 @@ export class GamePage extends BasePage {
         this.gm.ads.showRewarded('extra_hint').then((r) => {
             this.pauseTimer(false);
             this.sm.toast(r.message);
-            // 第一版未开放广告；接入后在 PuzzleManager 增加额外提示额度即可
+            if (r.status === 'rewarded' && this.pm) {
+                this.pm.grantExtraHint(1);
+                this.refreshHud(true);
+            }
         });
     }
 

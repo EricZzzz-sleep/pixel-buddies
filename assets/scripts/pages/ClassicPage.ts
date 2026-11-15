@@ -3,7 +3,7 @@ import { ART_LIST, ArtCategory } from '../art/ArtCatalog';
 import { P } from '../art/Palette';
 import { Theme } from '../ui/Theme';
 import { ScrollList } from '../ui/ScrollList';
-import { label, panel, sprite } from '../ui/UIKit';
+import { button, label, panel, sprite } from '../ui/UIKit';
 import { BasePage } from './BasePage';
 import { artCard, artCardHeight, categoryTabs, Flow, openDifficultySheet, setLabel } from './PageKit';
 
@@ -31,7 +31,18 @@ export class ClassicPage extends BasePage {
             this.category = c;
             this.refresh(true);
         });
-        const listTop = tabsY - 50;
+        // 像素工坊入口
+        const bannerY = tabsY - 84;
+        button(this.root, {
+            w: W,
+            h: 76,
+            text: '像素工坊：把照片变成像素拼图',
+            fontSize: Theme.font.small,
+            style: 'mint',
+            icon: gm.textures.icon('sparkle', P.leaf3, P.white),
+            onClick: () => this.sm.go('workshop'),
+        }, 0, bannerY);
+        const listTop = bannerY - 50;
         const listBottom = -L.h / 2 + L.safeBottom + 10;
         const h = listTop - listBottom;
         this.list = ScrollList.create(this.root, L.w, h, 0, listBottom + h / 2);
