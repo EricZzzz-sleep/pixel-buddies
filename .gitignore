@@ -7,3 +7,7 @@ native/
 node_modules/
 tools/node_modules/
 .DS_Store
+
+# 音乐生成器输出
+music-out/
+__pycache__/

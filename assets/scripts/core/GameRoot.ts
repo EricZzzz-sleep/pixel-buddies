@@ -2,6 +2,7 @@ import { _decorator, Canvas, Component, Director, director, game, Game, Graphics
 import { DEBUG, EDITOR } from 'cc/env';
 import { P } from '../art/Palette';
 import { AudioManager } from '../audio/AudioManager';
+import { MusicContext, pickBgm } from '../audio/MusicCatalog';
 import { CHALLENGE } from '../config/GameConfig';
 import { RELEASE } from '../config/PlatformConfig';
 import { ChallengePage } from '../pages/ChallengePage';
@@ -70,6 +71,12 @@ export class GameRoot extends Component {
         audio.load();
         this.gm.audio = audio;
         UIHooks.onButtonClick = () => audio.play('click', 0.6);
+        // 背景音乐跟随页面/主题切换（规则见 MusicCatalog.pickBgm）
+        const musicCtx: MusicContext = {};
+        this.sm.onPageEnter = (name, params) => {
+            const id = pickBgm(name, params, musicCtx);
+            if (id) audio.playMusic(id);
+        };
 
         this.sm.register(new HomePage(this.sm, 'home'));
         this.sm.register(new ClassicPage(this.sm, 'classic'));

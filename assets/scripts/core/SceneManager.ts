@@ -17,6 +17,8 @@ export class SceneManager {
     private current: BasePage | null = null;
     private toastNode: Node | null = null;
     private modalStack: Node[] = [];
+    /** 每次进入页面后回调（用于按页面切换背景音乐等） */
+    onPageEnter: ((name: PageName, params: any) => void) | null = null;
 
     constructor(readonly pageLayer: Node, readonly overlayLayer: Node, private readonly viewW: number, private readonly viewH: number) {}
 
@@ -55,6 +57,13 @@ export class SceneManager {
         next.root.setSiblingIndex(this.pageLayer.children.length - 1);
         next.onEnter(params);
         this.current = next;
+        if (this.onPageEnter) {
+            try {
+                this.onPageEnter(name, params);
+            } catch (e) {
+                console.warn('[SceneManager] onPageEnter 出错', e);
+            }
+        }
 
         // 过渡：新页面淡入 + 轻微位移；旧页面淡出后隐藏
         UIHooks.inputLocked = true;
