@@ -46,7 +46,14 @@ export class SeriesPage extends BasePage {
         const top = panel(content, W, ph, { fill: P.white, border: s.done ? color : P.ink, shadow: s.done ? color : P.ink, step: Theme.px, shadowDepth: 2 }, 0, -14 - ph / 2);
         label(top, `${s.collected}/${s.total}  ${SERIES_STATE_TEXT[s.state]}`, Theme.font.h2, { bold: true, align: 'left', width: W - 60 }).node.setPosition(-W / 2 + 30, ph / 2 - 44);
         segmentBar(top, s.total, s.collected, W - 60, 22, color, 0, ph / 2 - 92);
-        const hint = s.done ? '集齐奖励已获得，已自动生效' : s.remaining === 1 ? '只差最后 1 件！完成它即可领取全部奖励' : `再收集 ${s.remaining} 件，获得徽章、头像框和专属背景`;
+        const fin = gm.collection.finalItem(this.seriesId);
+        const hint = s.done
+            ? '集齐奖励已获得，已自动生效'
+            : fin && fin.playable
+              ? '只差最后 1 件！完成它即可领取全部奖励'
+              : fin
+                ? `只差最后 1 件，再收集 ${fin.starsNeeded} 颗星就能开始拼它`
+                : `再收集 ${s.remaining} 件，获得徽章、头像框和专属背景`;
         label(top, hint, Theme.font.small - 2, { color: s.done ? P.leaf3 : P.rose2, bold: true, align: 'left', width: W - 60 }).node.setPosition(-W / 2 + 30, ph / 2 - 134);
         rewardRow(top, s.info, s.done, W - 40, 0, -ph / 2 + 58);
 
@@ -63,7 +70,8 @@ export class SeriesPage extends BasePage {
             const playable = gm.collection.isPlayable(id);
             const col = i % cols;
             const row = Math.floor(i / cols);
-            const last = !got && s.remaining === 1;
+            // 只有最后一件已经能玩时才提示“最后一件！”，否则玩家点进去才发现不能玩
+            const last = !got && s.remaining === 1 && playable;
             const lockText = got ? '' : last ? '最后一件！集齐领奖' : playable ? '完成拼图即可收藏' : `再收集 ${Math.max(1, art.unlockStars - stars)} 颗星解锁拼图`;
             const d = gm.collection.itemDetail(id)!;
             artCard(content, {

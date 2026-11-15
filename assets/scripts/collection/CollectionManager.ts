@@ -242,6 +242,20 @@ export class CollectionManager {
         return open[0];
     }
 
+    /**
+     * 系列只剩最后一件时的状态。playable=false 说明还没达到星星解锁条件，
+     * 界面不能提前说“最后一件！集齐领奖”，而应告诉玩家还差多少颗星。
+     */
+    finalItem(seriesId: string): { art: ArtInfo; playable: boolean; starsNeeded: number } | null {
+        const s = this.seriesProgress(seriesId);
+        if (s.remaining !== 1) return null;
+        const id = s.info.items.find((i) => !this.isCollected(i));
+        const art = id ? getArt(id) : undefined;
+        if (!art) return null;
+        const playable = this.isPlayable(art.id);
+        return { art, playable, starsNeeded: playable ? 0 : Math.max(1, art.unlockStars - this.totalStars()) };
+    }
+
     itemDetail(itemId: string): ItemDetail | null {
         const art = getArt(itemId);
         if (!art) return null;

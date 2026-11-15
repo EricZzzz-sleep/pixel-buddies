@@ -129,6 +129,24 @@ test('总览、最近解锁、离奖励最近的系列、作品详情', () => {
     assert.equal(col.itemDetail('nope'), null);
 });
 
+test('只剩最后一件时：未达到星星条件不能提示“最后一件”，达到后才可以', () => {
+    const { col } = fresh();
+    for (const id of ['cat_orange', 'shiba', 'cat_white']) col.recordResult(res(id));
+    const fin = col.finalItem('animals')!;
+    assert.equal(fin.art.id, 'bunny');
+    assert.equal(col.seriesProgress('animals').remaining, 1);
+    assert.equal(fin.playable, col.isPlayable('bunny'));
+    assert.equal(fin.playable, false, '兔子需要更多星星，还不能玩');
+    assert.equal(fin.starsNeeded, 22 - col.totalStars());
+    assert.ok(fin.starsNeeded > 0);
+    assert.equal(col.finalItem('sweets'), null, '不是只剩一件的系列返回 null');
+    // 星星够了以后才算“可以完成的最后一件”
+    for (const id of ['macarons', 'ice_cream', 'flower_garden', 'beach_sunset', 'milk_tea', 'strawberry_cake', 'cozy_bedroom', 'starry_night']) for (const g of [3, 4, 5, 6] as const) col.recordResult(res(id, 20000, 3, g));
+    const fin2 = col.finalItem('animals')!;
+    assert.equal(fin2.playable, true);
+    assert.equal(fin2.starsNeeded, 0);
+});
+
 test('埋点：统一事件名，调试时输出到控制台但不上传', () => {
     const a = new Analytics();
     const lines: string[] = [];
