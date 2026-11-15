@@ -50,7 +50,7 @@ export abstract class BasePage {
     onAppHide(): void {}
 
     /** 标准页面头部：返回按钮 + 标题（垂直对齐胶囊按钮，右侧避开胶囊） */
-    protected header(title: string, onBack?: () => void): { title: ReturnType<typeof label>; back: ButtonHandle } {
+    protected header(title: string, onBack?: () => void, titleX = 0): { title: ReturnType<typeof label>; back: ButtonHandle } {
         const L = this.L;
         const back = button(this.root, {
             w: 84,
@@ -61,7 +61,7 @@ export abstract class BasePage {
             onClick: onBack || (() => this.sm.back()),
         }, -L.w / 2 + Theme.gutter + 42, L.headerY);
         const t = label(this.root, title, Theme.font.title, { bold: true, color: Theme.ink });
-        t.node.setPosition(0, L.headerY);
+        t.node.setPosition(titleX, L.headerY);
         return { title: t, back };
     }
 }

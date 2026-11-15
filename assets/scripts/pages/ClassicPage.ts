@@ -19,12 +19,13 @@ export class ClassicPage extends BasePage {
     protected build(): void {
         const L = this.L;
         const gm = this.gm;
-        this.header('经典拼图');
+        // 右侧要给星星徽章留位置（微信胶囊按钮会把可用宽度压窄），标题略向左移，避免两者重叠
+        this.header('经典拼图', undefined, -64);
         const W = L.w - Theme.gutter * 2;
-        const pill = panel(this.root, 150, 56, { fill: P.butter, border: P.ink, step: Theme.px, shadow: P.gold2 }, L.headerRight - 75, L.headerY);
-        sprite(pill, gm.textures.icon('star', P.gold, P.white), 26, 24, -44, 0);
+        const pill = panel(this.root, 108, 56, { fill: P.butter, border: P.ink, step: Theme.px, shadow: P.gold2 }, L.headerRight - 54, L.headerY);
+        sprite(pill, gm.textures.icon('star', P.gold, P.white), 26, 24, -26, 0);
         this.starsLabel = label(pill, '0', Theme.font.small, { bold: true });
-        this.starsLabel.node.setPosition(14, 0);
+        this.starsLabel.node.setPosition(18, 0);
 
         const tabsY = L.contentTop - 40;
         categoryTabs(this.root, tabsY, W, (c) => {
