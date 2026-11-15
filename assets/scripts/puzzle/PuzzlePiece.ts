@@ -50,19 +50,25 @@ export class PuzzlePiece {
     }
 
     /** 高亮：selected（选中，粉色）、hint（提示，金色）、target（拖动目标，薄荷绿）、correct（归位闪光） */
-    setGlow(kind: 'none' | 'selected' | 'hint' | 'target' | 'correct'): void {
+    setGlow(kind: 'none' | 'selected' | 'hint' | 'target' | 'correct' | 'dest'): void {
         const g = this.glowG;
         g.clear();
         if (kind === 'none') return;
-        const color = kind === 'selected' ? P.rose : kind === 'hint' ? P.gold : kind === 'target' ? P.mint3 : P.white;
+        // selected 粉：你拿起的方块；dest 绿：它应该去的位置；target 蓝：拖动时悬停的格子；hint 金：提示脉冲
+        const color = kind === 'selected' ? P.rose : kind === 'dest' ? P.mint3 : kind === 'hint' ? P.gold : kind === 'target' ? P.blue : P.white;
         const s = this.size;
-        const w = kind === 'correct' ? 6 : 5;
+        const w = kind === 'correct' ? 6 : kind === 'dest' ? 8 : 5;
         g.fillColor = hex(color, kind === 'correct' ? 200 : 255);
         g.rect(-s / 2, s / 2 - w, s, w);
         g.rect(-s / 2, -s / 2, s, w);
         g.rect(-s / 2, -s / 2 + w, w, s - w * 2);
         g.rect(s / 2 - w, -s / 2 + w, w, s - w * 2);
         g.fill();
+        if (kind === 'dest') {
+            g.fillColor = hex(P.mint, 70);
+            g.rect(-s / 2 + w, -s / 2 + w, s - w * 2, s - w * 2);
+            g.fill();
+        }
         if (kind === 'correct') {
             g.fillColor = hex(P.white, 90);
             g.rect(-s / 2 + w, -s / 2 + w, s - w * 2, s - w * 2);
@@ -98,6 +104,16 @@ export class PuzzlePiece {
         Tween.stopAllByTarget(this.node);
         this.node.angle = 0;
         tween(this.node).to(0.05, { angle: 6 }).to(0.08, { angle: -6 }).to(0.06, { angle: 3 }).to(0.05, { angle: 0 }).start();
+    }
+
+    /** 持续轻微呼吸（目标位置提示）；关闭时恢复原大小 */
+    pulseLoop(on: boolean): void {
+        Tween.stopAllByTarget(this.node);
+        this.node.setScale(1, 1, 1);
+        if (!on) return;
+        tween(this.node)
+            .repeatForever(tween().to(0.45, { scale: new Vec3(1.06, 1.06, 1) }, { easing: 'sineInOut' }).to(0.45, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' }))
+            .start();
     }
 
     /** 提示脉冲 */

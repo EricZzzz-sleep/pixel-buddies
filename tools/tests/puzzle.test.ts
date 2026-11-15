@@ -6,8 +6,8 @@ import { PuzzleManager } from '../../assets/scripts/puzzle/PuzzleManager';
 import { computeStars, isBetterRecord } from '../../assets/scripts/puzzle/PuzzleScoring';
 import { GridSize } from '../../assets/scripts/config/GameConfig';
 import { SeededRandom } from '../../assets/scripts/core/Random';
-import { scrambledCount, shuffleOrder } from '../../assets/scripts/puzzle/PuzzleShuffle';
-import { DIFFICULTIES } from '../../assets/scripts/config/GameConfig';
+import { shuffleOrder } from '../../assets/scripts/puzzle/PuzzleShuffle';
+import { beginnerSwaps, DIFFICULTIES, maxSwaps, misplacedCount, recommendedGrid } from '../../assets/scripts/config/GameConfig';
 
 /** 用“把正确方块换到位”的贪心策略还原，返回步数 */
 function solveGreedy(pm: PuzzleManager): number {
@@ -24,15 +24,19 @@ function solveGreedy(pm: PuzzleManager): number {
 }
 
 for (const grid of [3, 4, 5, 6] as GridSize[]) {
-    test(`${grid}×${grid}：生成合法、无重复、无丢失、按难度只打乱部分方块、非完成态（3000 个种子）`, () => {
+    test(`${grid}×${grid}：生成合法、无重复、无丢失、恰好 ${2 * DIFFICULTIES[grid].swaps} 块错位且两两互换（3000 个种子）`, () => {
         const n = grid * grid;
-        const m = scrambledCount(n, DIFFICULTIES[grid].scramble);
+        const swaps = DIFFICULTIES[grid].swaps;
         for (let seed = 0; seed < 3000; seed++) {
             const l = generateLayout({ imageId: 'cat_orange', grid, seed });
             assert.equal(l.order.length, n);
             assert.ok(isPermutation(l.order, n), `seed ${seed} 不是排列`);
             assert.ok(!isSolved(l.order), `seed ${seed} 生成了已完成局面`);
-            assert.equal(countFixedPoints(l.order), n - m, `seed ${seed} 开局归位块数应为 ${n - m}`);
+            assert.equal(countFixedPoints(l.order), n - misplacedCount(swaps), `seed ${seed} 开局归位块数`);
+            assert.equal(minSwapsToSolve(l.order), swaps, `seed ${seed} 最少交换次数应为 ${swaps}`);
+            assert.equal(l.swaps, swaps);
+            // 每个错位方块与另一个错位方块互为一对：order[order[i]] === i，没有格子被重复使用
+            for (let i = 0; i < n; i++) assert.equal(l.order[l.order[i]], i, `seed ${seed} 格子 ${i} 不在二元环中`);
         }
     });
 
@@ -57,10 +61,70 @@ test('不同种子产生不同布局（分布性抽查）', () => {
     assert.ok(set.size > 195);
 });
 
-test('shuffleOrder 对极小规模也安全', () => {
-    const o = shuffleOrder(2, new SeededRandom(7));
-    assert.deepEqual(o, [1, 0]);
-    assert.throws(() => shuffleOrder(1, new SeededRandom(1)));
+test('shuffleOrder：极小规模、非法参数与确定性', () => {
+    assert.deepEqual(shuffleOrder(2, new SeededRandom(7), 1), [1, 0]);
+    assert.throws(() => shuffleOrder(1, new SeededRandom(1), 1));
+    assert.throws(() => shuffleOrder(9, new SeededRandom(1), 5), /交换次数/);
+    assert.throws(() => shuffleOrder(9, new SeededRandom(1), 0));
+    assert.deepEqual(shuffleOrder(25, new SeededRandom(5), 6), shuffleOrder(25, new SeededRandom(5), 6));
+});
+
+test('交换次数覆盖：每个网格从 1 到上限的所有交换次数都精确生效', () => {
+    for (const grid of [3, 4, 5, 6] as GridSize[]) {
+        for (let swaps = 1; swaps <= maxSwaps(grid); swaps++) {
+            for (let seed = 0; seed < 40; seed++) {
+                const l = generateLayout({ imageId: 'bunny', grid, seed, swaps });
+                assert.equal(l.swaps, swaps);
+                assert.equal(minSwapsToSolve(l.order), swaps);
+                assert.equal(countFixedPoints(l.order), grid * grid - swaps * 2);
+            }
+        }
+    }
+    // 超出上限会被限制，不会报错
+    assert.equal(generateLayout({ imageId: 'x', grid: 3, seed: 1, swaps: 99 }).swaps, 4);
+    assert.equal(generateLayout({ imageId: 'x', grid: 3, seed: 1, swaps: 0 }).swaps, 1);
+});
+
+test('难度配置：交换次数与错位方块数符合设计表', () => {
+    const table = { 3: [1, 2], 4: [3, 6], 5: [6, 12], 6: [9, 18] } as Record<number, number[]>;
+    for (const g of [3, 4, 5, 6] as GridSize[]) {
+        assert.equal(DIFFICULTIES[g].swaps, table[g][0], `${g}×${g} 交换次数`);
+        assert.equal(misplacedCount(DIFFICULTIES[g].swaps), table[g][1], `${g}×${g} 错位块数`);
+        assert.ok(DIFFICULTIES[g].swaps <= maxSwaps(g));
+        assert.ok(DIFFICULTIES[g].blurb.includes(String(table[g][1])), '说明文字与错位块数一致');
+    }
+});
+
+test('新手渐进：前三局入门分别换 1/2/3 次，之后按配置；推荐难度随进度提升', () => {
+    assert.deepEqual([0, 1, 2, 3, 4].map(beginnerSwaps), [1, 2, 3, null, null]);
+    assert.deepEqual([0, 2, 3, 5, 6, 9, 10, 50].map(recommendedGrid), [3, 3, 4, 4, 5, 5, null, null]);
+    // 渐进局数同样可还原，最优步数就是交换次数
+    for (const c of [0, 1, 2]) {
+        const pm = new PuzzleManager({ imageId: 'cat_orange', grid: 3, seed: 3, swaps: beginnerSwaps(c)! });
+        assert.equal(pm.optimalMoves, c + 1);
+        assert.equal(solveGreedy(pm), c + 1);
+        assert.ok(pm.finished);
+    }
+});
+
+test('同一 (图片, 网格, 种子) 的挑战/每日布局一致；swaps 覆盖只影响显式传入的局', () => {
+    const base = generateLayout({ imageId: 'milk_tea', grid: 4, seed: 123456 });
+    assert.deepEqual(generateLayout({ imageId: 'milk_tea', grid: 4, seed: 123456 }).order, base.order);
+    assert.equal(base.swaps, DIFFICULTIES[4].swaps);
+    assert.notDeepEqual(generateLayout({ imageId: 'milk_tea', grid: 4, seed: 123456, swaps: 5 }).order, base.order);
+});
+
+test('peekHint 不消耗提示、不启动计时；总是给出可让两块同时归位的交换', () => {
+    const pm = new PuzzleManager({ imageId: 'bunny', grid: 5, seed: 77 });
+    const before = pm.hintsLeft;
+    const h = pm.peekHint()!;
+    assert.ok(h);
+    assert.equal(pm.hintsLeft, before);
+    assert.equal(pm.timer.started, false);
+    assert.equal(pm.pieceAt(h.fromCell), h.toCell);
+    assert.equal(pm.pieceAt(h.toCell), h.fromCell, '互为一对，一次交换两块同时归位');
+    const r = pm.trySwap(h.fromCell, h.toCell);
+    assert.equal(r.newlyCorrectCells.length, 2);
 });
 
 test('buildPieces 记录原始位置、当前位置、图片ID、是否归位', () => {
@@ -194,16 +258,4 @@ test('最少交换步数计算', () => {
     assert.equal(minSwapsToSolve([0, 1, 2, 3]), 0);
     assert.equal(minSwapsToSolve([1, 0, 3, 2]), 2);
     assert.equal(minSwapsToSolve([1, 2, 3, 0]), 3);
-});
-
-test('难度梯度：入门 3×3 打乱最少且开启拖动引导；难度越高打乱越多', () => {
-    const counts = ([3, 4, 5, 6] as GridSize[]).map((g) => scrambledCount(g * g, DIFFICULTIES[g].scramble));
-    assert.deepEqual(counts, [7, 10, 21, 36]);
-    assert.equal(DIFFICULTIES[3].dragGuide, true);
-    assert.equal(DIFFICULTIES[4].dragGuide, false);
-    // 3×3 平均最少步数明显低于旧版“全部打乱”的 4×4（15 步左右）
-    let total = 0;
-    for (let seed = 0; seed < 200; seed++) total += new PuzzleManager({ imageId: 'bunny', grid: 3, seed }).optimalMoves;
-    assert.ok(total / 200 < 7, `3×3 平均最少步数 ${total / 200}`);
-    assert.equal(scrambledCount(9, 0), 2, '至少打乱 2 块');
 });

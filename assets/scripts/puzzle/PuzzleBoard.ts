@@ -4,7 +4,6 @@ import { TextureFactory } from '../art/TextureFactory';
 import { hex, Theme } from '../ui/Theme';
 import { drawPanel, makeNode, sprite, opacityOf } from '../ui/UIKit';
 import { PuzzleManager, SwapOutcome } from './PuzzleManager';
-import { DIFFICULTIES } from '../config/GameConfig';
 import { PiecePool, PuzzlePiece } from './PuzzlePiece';
 
 export interface BoardCallbacks {
@@ -13,6 +12,8 @@ export interface BoardCallbacks {
     onPick(): void;
     onSwap(outcome: SwapOutcome, a: number, b: number): void;
     onLockedTouch(): void;
+    /** 教程限制下，玩家碰了不该碰的方块或做了不该做的交换 */
+    onRestricted?(cell: number): void;
 }
 
 const GAP = 4;
@@ -47,9 +48,15 @@ export class PuzzleBoard {
     private hoverCell = -1;
     private enabled = true;
     private solvedLook = false;
-    /** 新手辅助：拖动时高亮正确格 */
-    private guide = false;
-    private guideCell = -1;
+    private arrow!: Graphics;
+    /** 当前正在显示的引导：from=被拿起/被指示的方块所在格，to=它应该去的格 */
+    private gFrom = -1;
+    private gTo = -1;
+    /** 固定引导（提示按钮、教程）：不依赖玩家选中 */
+    private pin: { from: number; to: number; sticky: boolean } | null = null;
+    private pinToken = 0;
+    /** 教程限制：只允许操作这两个格子 */
+    private restrict: [number, number] | null = null;
 
     constructor(parent: Node, boardSize: number, private readonly textures: TextureFactory, private readonly cb: BoardCallbacks) {
         this.boardSize = boardSize;
@@ -57,6 +64,7 @@ export class PuzzleBoard {
         const bgNode = makeNode('BoardBg', this.node, boardSize, boardSize);
         this.bg = bgNode.addComponent(Graphics);
         this.pieceLayer = makeNode('Pieces', this.node, boardSize, boardSize);
+        this.arrow = makeNode('Arrow', this.node, boardSize, boardSize).addComponent(Graphics);
         this.peek = sprite(this.node, null, boardSize - 24, boardSize - 24);
         this.peekSprite = this.peek.node;
         this.peekSprite.active = false;
@@ -80,8 +88,11 @@ export class PuzzleBoard {
         this.cell = this.inner / this.grid;
         this.enabled = true;
         this.solvedLook = false;
-        this.guide = DIFFICULTIES[pm.spec.grid].dragGuide;
-        this.guideCell = -1;
+        this.gFrom = -1;
+        this.gTo = -1;
+        this.pin = null;
+        this.restrict = null;
+        this.arrow.clear();
         this.drawBackground();
         const sz = this.cell - GAP;
         for (let c = 0; c < pm.n; c++) {
@@ -113,6 +124,11 @@ export class PuzzleBoard {
         this.touchCell = -1;
         this.dragging = false;
         this.hoverCell = -1;
+        this.gFrom = -1;
+        this.gTo = -1;
+        this.pin = null;
+        this.restrict = null;
+        this.arrow.clear();
         this.pm = null;
     }
 
@@ -162,11 +178,18 @@ export class PuzzleBoard {
         const p = this.local(e);
         const c = this.cellAt(p.x, p.y);
         if (c < 0) return;
+        if (this.restrict && c !== this.restrict[0] && c !== this.restrict[1]) {
+            this.pieces[c].wiggle();
+            if (this.cb.onRestricted) this.cb.onRestricted(c);
+            return;
+        }
         if (!this.pm.canPick(c)) {
             this.pieces[c].wiggle();
             this.cb.onLockedTouch();
             return;
         }
+        // 提示的临时引导在玩家重新操作时消失；教程引导保持
+        if (this.pin && !this.pin.sticky) this.setPin(null);
         this.cb.onFirstTouch();
         this.touchCell = c;
         this.dragging = false;
@@ -186,8 +209,7 @@ export class PuzzleBoard {
             piece.stopTweens();
             piece.node.setSiblingIndex(this.pieceLayer.children.length - 1);
             tween(piece.node).to(0.08, { scale: new Vec3(1.1, 1.1, 1) }).start();
-            piece.setGlow('selected');
-            this.showGuide(piece.pieceId);
+            this.refreshGuide(this.touchCell);
             this.cb.onPick();
         }
         // 限制在棋盘范围内移动
@@ -196,10 +218,10 @@ export class PuzzleBoard {
         const target = this.cellAt(p.x, p.y);
         const valid = target >= 0 && target !== this.touchCell && this.pm.canPick(target) ? target : -1;
         if (valid !== this.hoverCell) {
-            if (this.hoverCell >= 0 && this.pieces[this.hoverCell]) this.pieces[this.hoverCell].setGlow('none');
+            this.restoreGlow(this.hoverCell);
             this.hoverCell = valid;
-            if (valid >= 0) this.pieces[valid].setGlow('target');
-            else if (this.guideCell >= 0 && this.pieces[this.guideCell]) this.pieces[this.guideCell].setGlow('hint');
+            // 悬停在“正确目标格”上时保持绿色，不改成普通悬停色
+            if (valid >= 0 && valid !== this.gTo) this.pieces[valid].setGlow('target');
         }
     }
 
@@ -207,25 +229,27 @@ export class PuzzleBoard {
         if (this.touchCell < 0 || !this.pm) return;
         const from = this.touchCell;
         this.touchCell = -1;
-        if (this.hoverCell >= 0 && this.pieces[this.hoverCell]) this.pieces[this.hoverCell].setGlow('none');
+        this.restoreGlow(this.hoverCell);
         this.hoverCell = -1;
-        this.hideGuide();
         if (this.dragging) {
             this.dragging = false;
             const p = this.local(e);
             const target = this.cellAt(p.x, p.y);
+            this.clearGuide();
             this.pieces[from].setGlow('none');
             if (target >= 0 && target !== from) this.doSwap(from, target, true);
-            else this.pieces[from].moveTo(this.center(from), 0.15);
+            else {
+                this.pieces[from].moveTo(this.center(from), 0.15);
+                this.refreshGuide(-1);
+            }
             return;
         }
         // 点选交换
         if (this.selectedCell < 0) {
             this.selectedCell = from;
             const piece = this.pieces[from];
-            piece.setGlow('selected');
             tween(piece.node).to(0.08, { scale: new Vec3(1.06, 1.06, 1) }).start();
-            this.showGuide(piece.pieceId);
+            this.refreshGuide(from);
             this.cb.onPick();
         } else if (this.selectedCell === from) {
             this.clearSelection();
@@ -245,39 +269,139 @@ export class PuzzleBoard {
             this.pieces[this.touchCell].setGlow('none');
             this.pieces[this.touchCell].moveTo(this.center(this.touchCell), 0.15);
         }
-        if (this.hoverCell >= 0 && this.pieces[this.hoverCell]) this.pieces[this.hoverCell].setGlow('none');
-        this.hideGuide();
+        this.restoreGlow(this.hoverCell);
         this.touchCell = -1;
         this.hoverCell = -1;
         this.dragging = false;
+        this.refreshGuide(this.selectedCell);
     }
 
-    /** 新手辅助：高亮方块的正确格（方块 ID 即正确格索引） */
-    private showGuide(pieceId: number): void {
-        if (!this.guide || !this.pm) return;
-        this.hideGuide();
-        if (pieceId < 0 || pieceId >= this.pm.n || this.pm.isCellCorrect(pieceId)) return;
-        this.guideCell = pieceId;
-        this.pieces[pieceId].setGlow('hint');
+    // ------------------------------------------------------------ 引导（目标格高亮 + 箭头）
+
+    /** 悬停高亮离开后，把格子恢复成引导应有的颜色 */
+    private restoreGlow(cell: number): void {
+        if (cell < 0 || !this.pieces[cell]) return;
+        this.pieces[cell].setGlow(cell === this.gTo ? 'dest' : cell === this.gFrom ? 'selected' : 'none');
     }
 
-    private hideGuide(): void {
-        if (this.guideCell >= 0 && this.pieces[this.guideCell] && this.guideCell !== this.selectedCell) this.pieces[this.guideCell].setGlow('none');
-        this.guideCell = -1;
+    /**
+     * 刷新引导。优先级：玩家当前拿起/选中的方块 > 固定引导（提示/教程）。
+     * 目标格 = 该方块的原始位置（方块 ID）。已归位（锁定）的格子永远不会被当作目标。
+     */
+    private refreshGuide(activeFrom: number): void {
+        const pm = this.pm;
+        let from = -1, to = -1;
+        if (pm) {
+            if (activeFrom >= 0 && this.pieces[activeFrom]) {
+                from = activeFrom;
+                to = this.pieces[activeFrom].pieceId;
+            } else if (this.pin) {
+                from = this.pin.from;
+                to = this.pin.to;
+            }
+            if (from >= 0 && (to === from || to < 0 || to >= pm.n || pm.isCellCorrect(to) || pm.isCellCorrect(from))) {
+                from = -1;
+                to = -1;
+            }
+        }
+        if (from === this.gFrom && to === this.gTo) return;
+        this.clearGuide();
+        if (from < 0) return;
+        this.gFrom = from;
+        this.gTo = to;
+        this.pieces[from].setGlow('selected');
+        const dest = this.pieces[to];
+        dest.setGlow('dest');
+        dest.pulseLoop(true);
+        this.drawArrow(from, to);
+    }
+
+    private clearGuide(): void {
+        if (this.gFrom >= 0 && this.pieces[this.gFrom]) this.pieces[this.gFrom].setGlow('none');
+        if (this.gTo >= 0 && this.pieces[this.gTo]) {
+            this.pieces[this.gTo].setGlow('none');
+            this.pieces[this.gTo].pulseLoop(false);
+        }
+        this.gFrom = -1;
+        this.gTo = -1;
+        this.arrow.clear();
+    }
+
+    /** 像素风虚线箭头：从方块当前格指向它的正确格 */
+    private drawArrow(from: number, to: number): void {
+        const g = this.arrow;
+        g.clear();
+        const a = this.center(from), b = this.center(to);
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        if (len < 1) return;
+        const ux = dx / len, uy = dy / len;
+        const margin = this.cell * 0.34;
+        const head = Math.min(34, this.cell * 0.3);
+        const lineEnd = len - margin - head * 0.6;
+        for (let t = margin; t < lineEnd; t += 18) {
+            g.fillColor = hex(P.ink);
+            g.rect(a.x + ux * t - 7, a.y + uy * t - 7, 14, 14);
+            g.fill();
+        }
+        for (let t = margin; t < lineEnd; t += 18) {
+            g.fillColor = hex(P.yellow);
+            g.rect(a.x + ux * t - 4, a.y + uy * t - 4, 8, 8);
+            g.fill();
+        }
+        // 箭头头部（三角形，先描边再填色）
+        const tipX = b.x - ux * margin, tipY = b.y - uy * margin;
+        const nx = -uy, ny = ux;
+        const tri = (k: number, color: number) => {
+            g.fillColor = hex(color);
+            g.moveTo(tipX + ux * k, tipY + uy * k);
+            g.lineTo(tipX - ux * (head + k) + nx * (head * 0.62 + k), tipY - uy * (head + k) + ny * (head * 0.62 + k));
+            g.lineTo(tipX - ux * (head + k) - nx * (head * 0.62 + k), tipY - uy * (head + k) - ny * (head * 0.62 + k));
+            g.close();
+            g.fill();
+        };
+        tri(5, P.ink);
+        tri(0, P.yellow);
+    }
+
+    /** 清除全部引导（撤销、暂停等外部改变布局时调用） */
+    resetGuide(): void {
+        if (!this.restrict) this.pin = null;
+        this.clearSelection();
+    }
+
+    /** 固定引导：提示按钮 / 教程。sticky=true 时玩家操作不会让它消失 */
+    private setPin(pin: { from: number; to: number; sticky: boolean } | null): void {
+        this.pin = pin;
+        this.pinToken++;
+        this.refreshGuide(this.selectedCell);
     }
 
     private clearSelection(): void {
-        this.hideGuide();
         if (this.selectedCell >= 0 && this.pieces[this.selectedCell]) {
             const p = this.pieces[this.selectedCell];
-            p.setGlow('none');
             tween(p.node).to(0.08, { scale: new Vec3(1, 1, 1) }).start();
         }
         this.selectedCell = -1;
+        this.clearGuide();
+        this.refreshGuide(-1);
     }
 
     private doSwap(a: number, b: number, fromDrag: boolean): void {
         if (!this.pm) return;
+        if (this.restrict) {
+            const ok = (a === this.restrict[0] && b === this.restrict[1]) || (a === this.restrict[1] && b === this.restrict[0]);
+            if (!ok) {
+                this.pieces[a].moveTo(this.center(a), 0.15);
+                this.pieces[b].wiggle();
+                this.refreshGuide(-1);
+                if (this.cb.onRestricted) this.cb.onRestricted(b);
+                return;
+            }
+        }
+        // 先清掉引导和呼吸动画，再执行交换动画
+        this.clearGuide();
+        if (this.pin) this.pin = null;
         const outcome = this.pm.trySwap(a, b);
         if (!outcome.swapped) {
             this.pieces[a].moveTo(this.center(a), 0.15);
@@ -305,13 +429,21 @@ export class PuzzleBoard {
         return this.center(cell);
     }
 
+    /** 提示：用同一套“粉色源 → 绿色目标 + 箭头”演示正确的交换，停留约 3.5 秒或玩家下次操作时消失 */
     showHint(fromCell: number, toCell: number): void {
         this.clearSelection();
-        this.pieces[fromCell].pulse(3);
-        // 目标格闪烁薄荷绿
-        const t = this.pieces[toCell];
-        t.setGlow('target');
-        this.scheduleOnce(() => t.setGlow('none'), 1.1);
+        this.setPin({ from: fromCell, to: toCell, sticky: false });
+        const token = this.pinToken;
+        this.scheduleOnce(() => {
+            if (this.pin && this.pinToken === token) this.setPin(null);
+        }, 3.5);
+    }
+
+    /** 教程：固定显示一对方块的交换引导，并限制只能操作这两个格子（传 null 解除） */
+    setTutorialPair(pair: [number, number] | null): void {
+        this.restrict = pair;
+        this.clearSelection();
+        this.setPin(pair ? { from: pair[0], to: pair[1], sticky: true } : null);
     }
 
     /** 查看原图：覆盖在棋盘上 */

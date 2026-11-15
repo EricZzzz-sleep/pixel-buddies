@@ -140,6 +140,20 @@ export class PuzzleManager {
      */
     useHint(): HintInfo | null {
         if (this._finished || this.hintsLeft <= 0) return null;
+        const pick = this.peekHint();
+        if (pick) {
+            this._hintsUsed++;
+            this.timer.start();
+        }
+        return pick;
+    }
+
+    /**
+     * 查找一个有效的交换建议，但不消耗提示次数、不启动计时（教程和引导使用）。
+     * 优先“一次交换让两块同时归位”的组合。
+     */
+    peekHint(): HintInfo | null {
+        if (this._finished) return null;
         let pick: HintInfo | null = null;
         for (let cell = 0; cell < this.n; cell++) {
             const piece = this.order[cell];
@@ -156,10 +170,6 @@ export class PuzzleManager {
                     break;
                 }
             }
-        }
-        if (pick) {
-            this._hintsUsed++;
-            this.timer.start();
         }
         return pick;
     }

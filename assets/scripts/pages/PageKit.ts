@@ -1,11 +1,11 @@
-import { Label, Node, SpriteFrame } from 'cc';
+import { Graphics, Label, Node, SpriteFrame } from 'cc';
 import { ArtCategory, ArtInfo, CATEGORY_LABEL, CATEGORY_ORDER, getArt } from '../art/ArtCatalog';
 import { P } from '../art/Palette';
-import { BEGINNER_GRID, DIFFICULTIES, GridSize, SUPPORTED_GRIDS } from '../config/GameConfig';
+import { beginnerSwaps, DIFFICULTIES, GridSize, misplacedCount, recommendedGrid, SUPPORTED_GRIDS } from '../config/GameConfig';
 import { formatDuration } from '../core/GameTimer';
 import { GameManager, PlaySession } from '../core/GameManager';
 import { randomSeed } from '../core/Random';
-import { Theme, TINTS } from '../ui/Theme';
+import { hex, Theme, TINTS } from '../ui/Theme';
 import { button, ButtonHandle, label, makeNode, onTap, panel, sprite, starRow } from '../ui/UIKit';
 
 /** 页面共用的组件与流程 */
@@ -107,53 +107,101 @@ export function categoryTabs(parent: Node, y: number, width: number, onChange: (
     };
 }
 
-/** 难度选择弹窗：显示每个难度的最佳成绩，选择后回调 */
+/** 难度卡片左侧的迷你棋盘：粉色格子 = 开局放错的方块，绿色格子 = 已经在正确位置 */
+function miniBoard(parent: Node, grid: number, wrong: number, size: number, x: number, y: number): void {
+    const n = grid * grid;
+    const node = makeNode('Mini', parent, size, size, x, y);
+    const g = node.addComponent(Graphics);
+    const gap = 3;
+    const cs = (size - gap * (grid - 1)) / grid;
+    // 错位格子均匀分布，只是示意
+    const wrongSet = new Set<number>();
+    for (let k = 0; k < wrong; k++) wrongSet.add(Math.floor(((k + 0.5) * n) / wrong));
+    for (let i = 0; i < n; i++) {
+        const col = i % grid, row = Math.floor(i / grid);
+        g.fillColor = hex(wrongSet.has(i) ? P.rose : P.mint2);
+        g.rect(-size / 2 + col * (cs + gap), size / 2 - (row + 1) * cs - row * gap, cs, cs);
+        g.fill();
+    }
+}
+
+/** 已完成的某难度局数（用于新手渐进） */
+function completionsAt(grid: GridSize): number {
+    const recs = GameManager.I.save.data.records;
+    let n = 0;
+    for (const id of Object.keys(recs)) n += (recs[id][String(grid)] && recs[id][String(grid)].completions) || 0;
+    return n;
+}
+
+/** 本局入门拼图的交换次数：前 3 局 1/2/3 次，之后用配置值 */
+export function currentBeginnerSwaps(): number {
+    const s = beginnerSwaps(completionsAt(3));
+    return s === null ? DIFFICULTIES[3].swaps : s;
+}
+
+/**
+ * 难度选择弹窗：每一档都说明“几块放错、要换几次”，并显示迷你棋盘、个人最佳；
+ * 根据玩家进度推荐一档（新手推荐入门 3×3）。
+ */
 export function openDifficultySheet(art: ArtInfo, onPick: (grid: GridSize) => void, title = '选择难度'): void {
     const gm = GameManager.I;
     const sm = gm.scene;
-    const w = Math.min(gm.layout.w - 48, 640);
-    const h = 1010;
-    // 还没完成过任何一局：推荐入门难度
-    const beginner = gm.save.data.totalCompletions === 0;
+    const w = Math.min(gm.layout.w - 40, 680);
+    const rowH = 158;
+    const headH = 250;
+    const h = headH + rowH * SUPPORTED_GRIDS.length + 56;
+    const rec = recommendedGrid(gm.save.data.totalCompletions);
     const card = sm.openModal(w, h);
-    const t = label(card, title, Theme.font.h2, { bold: true });
-    t.node.setPosition(0, h / 2 - 56);
-    artFrame(card, gm.textures.art(art.id), 200, 0, h / 2 - 210, art.tint);
-    const name = label(card, art.name, Theme.font.h2, { bold: true });
-    name.node.setPosition(0, h / 2 - 350);
-    const story = label(card, art.story, Theme.font.small, { color: P.ink2, width: w - 80, wrap: true });
-    story.node.setPosition(0, h / 2 - 396);
-    const colors = ['butter', 'mint', 'sky', 'lilac'] as const;
+    label(card, title, Theme.font.h2, { bold: true }).node.setPosition(0, h / 2 - 50);
+    artFrame(card, gm.textures.art(art.id), 120, -w / 2 + 110, h / 2 - 160, art.tint);
+    label(card, art.name, Theme.font.h2, { bold: true, align: 'left', width: w - 240 }).node.setPosition(-w / 2 + 196, h / 2 - 125);
+    label(card, art.story, Theme.font.small - 2, { color: P.ink2, width: w - 240, wrap: true, align: 'left' }).node.setPosition(-w / 2 + 196, h / 2 - 182);
+
+    const rw = w - 56;
+    const rh = rowH - 14;
     SUPPORTED_GRIDS.forEach((g, i) => {
         const d = DIFFICULTIES[g];
-        const rec = gm.collection.getRecord(art.id, g);
-        const sub = rec
-            ? `最佳 ${formatDuration(rec.bestTimeMs)} · ${rec.bestMoves} 步 · ${'★'.repeat(rec.bestStars)}${'☆'.repeat(3 - rec.bestStars)}`
-            : beginner && g === BEGINNER_GRID
-              ? '推荐第一次玩'
-              : '尚未完成';
-        button(card, {
-            w: w - 80,
-            h: 98,
-            text: `${d.label}  ${d.desc}`,
-            sub,
-            style: colors[i],
-            fontSize: Theme.font.body,
-            onClick: () => {
-                sm.closeModal();
-                onPick(g);
-            },
-        }, 0, h / 2 - 494 - i * 116);
+        const swaps = g === 3 ? currentBeginnerSwaps() : d.swaps;
+        const wrong = misplacedCount(swaps);
+        const best = gm.collection.getRecord(art.id, g);
+        const tint = TINTS[['butter', 'mint', 'sky', 'lilac'][i] as keyof typeof TINTS];
+        const recommended = rec === g;
+        const y = h / 2 - headH - rowH / 2 - i * rowH + 10;
+        const row = panel(card, rw, rh, { fill: P.white, border: recommended ? P.rose : P.ink, shadow: tint[1], step: Theme.px, shadowDepth: 1.5 }, 0, y);
+        miniBoard(row, g, wrong, 84, -rw / 2 + 70, 0);
+        label(row, `${d.label}  ${g}×${g}`, Theme.font.body, { bold: true, align: 'left', width: rw - 330 }).node.setPosition(-rw / 2 + 130, 36);
+        label(row, `${wrong} 块放错 · 换 ${swaps} 次完成`, Theme.font.small - 2, { color: P.rose2, bold: true, align: 'left', width: rw - 330 }).node.setPosition(-rw / 2 + 130, 0);
+        const note = g === 3 && beginnerSwaps(completionsAt(3)) !== null ? `新手第 ${completionsAt(3) + 1} 局，一步步学会` : d.blurb;
+        label(row, note, Theme.font.tiny, { color: Theme.textMuted, align: 'left', width: rw - 330 }).node.setPosition(-rw / 2 + 130, -34);
+        if (best) {
+            starRow(row, starFrames(), best.bestStars, 3, 22, 4).setPosition(rw / 2 - 90, 16);
+            label(row, `${formatDuration(best.bestTimeMs)} · ${best.bestMoves} 步`, Theme.font.tiny, { color: P.ink2, bold: true }).node.setPosition(rw / 2 - 90, -18);
+        } else {
+            label(row, '尚未完成', Theme.font.tiny, { color: Theme.textMuted }).node.setPosition(rw / 2 - 90, 0);
+        }
+        if (recommended) {
+            const tag = panel(row, 132, 34, { fill: P.rose, border: P.ink, shadow: undefined, step: 3 }, rw / 2 - 90, rh / 2);
+            label(tag, g === 3 ? '推荐新手' : '推荐', Theme.font.tiny, { bold: true, color: P.white });
+        }
+        onTap(row, () => {
+            gm.audio.play('click');
+            sm.closeModal();
+            onPick(g);
+        });
     });
-    const close = label(card, '轻点空白处关闭', Theme.font.tiny, { color: Theme.textMuted });
-    close.node.setPosition(0, -h / 2 + 30);
+    label(card, '轻点空白处关闭', Theme.font.tiny, { color: Theme.textMuted }).node.setPosition(0, -h / 2 + 28);
 }
 
 /** 开局流程 */
 export const Flow = {
     classic(imageId: string, grid: GridSize): void {
-        const session: PlaySession = { mode: 'classic', spec: { imageId, grid, seed: randomSeed() } };
-        GameManager.I.scene.go('game', session);
+        const spec: PlaySession['spec'] = { imageId, grid, seed: randomSeed() };
+        // 新手渐进：前 3 局入门拼图分别换 1/2/3 次（只影响经典模式的随机局；每日/挑战不受影响）
+        if (grid === 3) {
+            const s = beginnerSwaps(completionsAt(3));
+            if (s !== null) spec.swaps = s;
+        }
+        GameManager.I.scene.go('game', { mode: 'classic', spec } as PlaySession);
     },
     daily(): void {
         const gm = GameManager.I;

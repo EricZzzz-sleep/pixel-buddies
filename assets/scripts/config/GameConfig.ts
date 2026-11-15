@@ -25,12 +25,13 @@ export interface DifficultyConfig {
     /** 每局免费“定位提示”次数 */
     freeHints: number;
     /**
-     * 打乱比例（0~1）：被打乱的方块占比，其余方块开局就在正确位置并锁定。
-     * 难度越低打乱越少，新手第一局不会一上来就面对整盘乱块。
+     * 开局需要交换的次数（= 最少步数）。
+     * 打乱方式：随机选出 2×swaps 个互不重复的格子，两两互换；其余方块开局就在正确位置并锁定。
+     * 因此错位方块数恒为 2×swaps，恰好 swaps 次交换即可还原。
      */
-    scramble: number;
-    /** 拖动方块时轻轻高亮它的正确位置（新手辅助） */
-    dragGuide: boolean;
+    swaps: number;
+    /** 一句话难度说明（难度选择页展示） */
+    blurb: string;
     stars: StarThresholds;
 }
 
@@ -40,8 +41,8 @@ export const DIFFICULTIES: Record<GridSize, DifficultyConfig> = {
         label: '入门',
         desc: '3×3 · 9 块',
         freeHints: 3,
-        scramble: 0.78,
-        dragGuide: true,
+        swaps: 1,
+        blurb: '只有 2 块放错，换 1 次就完成',
         stars: { threeStarSeconds: 30, twoStarSeconds: 80, threeStarMoveRatio: 1.34, twoStarMoveRatio: 2.0 },
     },
     4: {
@@ -49,8 +50,8 @@ export const DIFFICULTIES: Record<GridSize, DifficultyConfig> = {
         label: '简单',
         desc: '4×4 · 16 块',
         freeHints: 3,
-        scramble: 0.6,
-        dragGuide: false,
+        swaps: 3,
+        blurb: '6 块放错，轻松热身',
         stars: { threeStarSeconds: 45, twoStarSeconds: 120, threeStarMoveRatio: 1.25, twoStarMoveRatio: 1.8 },
     },
     5: {
@@ -58,8 +59,8 @@ export const DIFFICULTIES: Record<GridSize, DifficultyConfig> = {
         label: '普通',
         desc: '5×5 · 25 块',
         freeHints: 3,
-        scramble: 0.85,
-        dragGuide: false,
+        swaps: 6,
+        blurb: '12 块放错，需要一点观察',
         stars: { threeStarSeconds: 120, twoStarSeconds: 270, threeStarMoveRatio: 1.3, twoStarMoveRatio: 1.9 },
     },
     6: {
@@ -67,8 +68,8 @@ export const DIFFICULTIES: Record<GridSize, DifficultyConfig> = {
         label: '困难',
         desc: '6×6 · 36 块',
         freeHints: 4,
-        scramble: 1,
-        dragGuide: false,
+        swaps: 9,
+        blurb: '18 块放错，考验耐心',
         stars: { threeStarSeconds: 210, twoStarSeconds: 420, threeStarMoveRatio: 1.35, twoStarMoveRatio: 2.0 },
     },
 };
@@ -77,6 +78,33 @@ export const SUPPORTED_GRIDS: GridSize[] = [3, 4, 5, 6];
 
 /** 新手（还没完成过任何一局）推荐的难度 */
 export const BEGINNER_GRID: GridSize = 3;
+
+/** 错位方块数 = 2 × 交换次数 */
+export function misplacedCount(swaps: number): number {
+    return swaps * 2;
+}
+
+/** 某个难度允许的最大交换次数：每次交换用掉 2 个互不重复的格子 */
+export function maxSwaps(grid: GridSize): number {
+    return Math.floor((grid * grid) / 2);
+}
+
+/**
+ * 新手渐进：前 3 局入门拼图分别需要换 1、2、3 次，之后恢复为配置值。
+ * @param beginnerCompletions 已完成的 3×3 局数
+ * @returns 本局的交换次数；超过 3 局返回 null（使用难度配置）
+ */
+export function beginnerSwaps(beginnerCompletions: number): number | null {
+    return beginnerCompletions >= 0 && beginnerCompletions < 3 ? beginnerCompletions + 1 : null;
+}
+
+/** 根据已完成总局数推荐的难度；老玩家返回 null */
+export function recommendedGrid(totalCompletions: number): GridSize | null {
+    if (totalCompletions < 3) return 3;
+    if (totalCompletions < 6) return 4;
+    if (totalCompletions < 10) return 5;
+    return null;
+}
 
 export function isGridSize(v: unknown): v is GridSize {
     return v === 3 || v === 4 || v === 5 || v === 6;

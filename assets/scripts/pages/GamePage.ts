@@ -1,15 +1,17 @@
-import { BlockInputEvents, Graphics, Label, Node, tween, Tween, Vec3 } from 'cc';
+import { BlockInputEvents, Graphics, Label, Node, Sprite, tween, Tween, UITransform, Vec3 } from 'cc';
 import { P } from '../art/Palette';
 import { DIFFICULTIES } from '../config/GameConfig';
 import { formatDuration } from '../core/GameTimer';
 import { PlaySession, ResultPayload } from '../core/GameManager';
 import { PuzzleBoard } from '../puzzle/PuzzleBoard';
+import { BEGINNER_GRID } from '../config/GameConfig';
 import { PuzzleManager, SwapOutcome } from '../puzzle/PuzzleManager';
 import { computeStars } from '../puzzle/PuzzleScoring';
 import { Effects } from '../ui/Effects';
 import { hex, Theme } from '../ui/Theme';
 import { Ticker } from '../ui/Ticker';
-import { button, ButtonHandle, label, makeNode, opacityOf, panel, sprite } from '../ui/UIKit';
+import { artFrame } from './PageKit';
+import { button, ButtonHandle, label, makeNode, onTap, opacityOf, panel, sprite } from '../ui/UIKit';
 import { BasePage } from './BasePage';
 
 const MODE_TAG: Record<PlaySession['mode'], string> = {
@@ -42,7 +44,16 @@ export class GamePage extends BasePage {
     private lastShownSecond = -1;
     private paused = false;
     private finishing = false;
-    private tutorialNode: Node | null = null;
+    private refSprite!: Sprite;
+    private fxLayer!: Node;
+    private refRect = { x: 0, y: 0, w: 0, h: 0 };
+    private boardRect = { x: 0, y: 0, w: 0, h: 0 };
+    /** 教程状态：step 1 看目标 / 2 认识交换 / 3 亲手试 / 4 庆祝 */
+    private tut: { step: 1 | 2 | 3 | 4; pair: [number, number] } | null = null;
+    private tutLayer: Node | null = null;
+    private tutBody: Label | null = null;
+    private tutCard: Node | null = null;
+    private tutAfter: (() => void) | null = null;
 
     protected build(): void {
         const L = this.L;
@@ -50,31 +61,47 @@ export class GamePage extends BasePage {
         const W = L.w - Theme.gutter * 2;
 
         // 头部：暂停 + 标题
-        button(this.root, { w: 84, h: 72, style: 'white', icon: gm.textures.icon('pause', P.ink), iconSize: 26, onClick: () => this.openPause() }, -L.w / 2 + Theme.gutter + 42, L.headerY);
+        button(this.root, { w: 84, h: 72, style: 'white', icon: gm.textures.icon('pause', P.ink), iconSize: 26, onClick: () => !this.tutLocked() && this.openPause() }, -L.w / 2 + Theme.gutter + 42, L.headerY);
         this.titleLabel = label(this.root, '', Theme.font.h2, { bold: true, width: 360 });
         this.titleLabel.node.setPosition(0, L.headerY + 14);
         this.tagLabel = label(this.root, '', Theme.font.tiny, { color: Theme.textMuted, width: 360 });
         this.tagLabel.node.setPosition(0, L.headerY - 22);
 
-        // HUD 三个数据块
-        // 纵向自适应：棋盘受宽度限制，高屏多出的空间平分到 HUD 上下，避免棋盘上下大块留白
+        // 顶部信息区：左边“目标图片”（常驻），右边 时间 / 步数 / 三星倒计时
+        // 纵向自适应：棋盘受宽度限制，高屏多出的空间平分到信息区上下，避免棋盘上下大块留白
+        const TB = 156;
         const toolY = -L.h / 2 + L.safeBottom + 24 + 56;
         const progY = toolY + 52 + 44;
-        const baseHud = L.contentTop - 46;
-        const spare = Math.max(0, baseHud - 38 - 24 - (progY + 48) - (W + 8));
-        const hudY = baseHud - spare * 0.3;
-        const bw = (W - 24) / 3;
+        const baseTop = L.contentTop - 24;
+        const baseAreaTop = baseTop - TB - 30;
+        const spare = Math.max(0, baseAreaTop - (progY + 48) - (W + 8));
+        const tbY = baseTop - TB / 2 - spare * 0.3;
+
+        const refX = -W / 2 + TB / 2;
+        const refFrame = artFrame(this.root, gm.textures.art('cat_orange'), TB - 20, refX, tbY, 'pink');
+        this.refSprite = refFrame.getComponentInChildren(Sprite)!;
+        this.refRect = { x: refX, y: tbY, w: TB, h: TB };
+        const refTag = panel(this.root, 124, 34, { fill: P.rose, border: P.ink, shadow: undefined, step: 3 }, refX, tbY + TB / 2 + 6);
+        label(refTag, '目标图片', Theme.font.tiny, { bold: true, color: P.white });
+        const zoomTag = panel(this.root, 124, 30, { fill: P.white, border: P.ink, shadow: undefined, step: 3 }, refX, tbY - TB / 2 - 6);
+        label(zoomTag, '点击放大', Theme.font.tiny - 2, { bold: true, color: P.ink2 });
+        onTap(refFrame, () => this.openReference());
+
+        const sx = refX + TB / 2 + 24;
+        const sw = W / 2 - sx;
+        const rowH = 46, rowGap = (TB - rowH * 3) / 2;
         const mk = (i: number, icon: string, color: number, fill: number) => {
-            const p = panel(this.root, bw, 76, { fill, border: P.ink, shadow: P.ink, step: Theme.px, shadowDepth: 1 }, -W / 2 + bw / 2 + i * (bw + 12), hudY);
-            sprite(p, gm.textures.icon(icon, color, P.white), 28, 28, -bw / 2 + 34, 0);
-            const l = label(p, '', Theme.font.body, { bold: true, width: bw - 70 });
-            l.node.setPosition(20, 0);
+            const y = tbY + TB / 2 - rowH / 2 - i * (rowH + rowGap);
+            const p = panel(this.root, sw, rowH, { fill, border: P.ink, shadow: P.ink, step: Theme.px, shadowDepth: 1 }, sx + sw / 2, y);
+            sprite(p, gm.textures.icon(icon, color, P.white), 24, 24, -sw / 2 + 30, 0);
+            const l = label(p, '', Theme.font.small, { bold: true, width: sw - 80 });
+            l.node.setPosition(18, 0);
             return l;
         };
         this.timeLabel = mk(0, 'clock', P.blue3, P.sky);
         this.movesLabel = mk(1, 'steps', P.leaf3, P.mint);
         this.goalLabel = mk(2, 'star', P.gold2, P.butter);
-        this.goalLabel.fontSize = Theme.font.small;
+        this.goalLabel.fontSize = Theme.font.small - 2;
 
         // 工具栏
         const tw = (W - 32) / 3;
@@ -94,7 +121,7 @@ export class GamePage extends BasePage {
         this.progressBar = bar.addComponent(Graphics);
 
         // 棋盘：在 HUD 与进度条之间取最大正方形
-        const areaTop = hudY - 38 - 24;
+        const areaTop = baseAreaTop - spare * 0.3;
         const areaBottom = progY + 48;
         const boardSize = Math.min(W + 8, areaTop - areaBottom);
         this.board = new PuzzleBoard(this.root, boardSize, gm.textures, {
@@ -102,11 +129,14 @@ export class GamePage extends BasePage {
             onPick: () => gm.audio.play('pick', 0.6),
             onSwap: (o, a, b) => this.onSwap(o, a, b),
             onLockedTouch: () => gm.audio.play('error', 0.5),
+            onRestricted: () => this.onTutorialMistake(),
         });
-        this.board.node.setPosition(0, (areaTop + areaBottom) / 2);
+        const boardY = (areaTop + areaBottom) / 2;
+        this.board.node.setPosition(0, boardY);
+        this.boardRect = { x: 0, y: boardY, w: boardSize, h: boardSize };
 
-        const fxLayer = makeNode('Fx', this.root, L.w, L.h);
-        this.fx = new Effects(fxLayer);
+        this.fxLayer = makeNode('Fx', this.root, L.w, L.h);
+        this.fx = new Effects(this.fxLayer);
 
         const ticker = this.root.addComponent(Ticker);
         ticker.cb = () => this.tick();
@@ -128,13 +158,17 @@ export class GamePage extends BasePage {
         this.tagLabel.string = `${MODE_TAG[session.mode]} · ${d.label} ${d.desc}`;
         gm.collection.recordPlayStarted();
         gm.analytics.track('puzzle_start', { mode: session.mode, image: session.spec.imageId, grid: session.spec.grid });
+        this.refSprite.spriteFrame = gm.textures.art(session.spec.imageId);
         this.refreshHud(true);
-        if (!gm.save.data.tutorial.puzzleBasics) this.showTutorial();
+        // 教程：只在玩家还没学过时出现，且只出现在入门拼图或玩家的第一局
+        const first = gm.save.data.totalCompletions === 0;
+        if (!gm.save.data.tutorial.puzzleBasics && (session.spec.grid === BEGINNER_GRID || first)) this.startTutorial();
     }
 
     onExit(): void {
         this.setPeek(false);
-        this.closeTutorial();
+        this.closeTutorial(false);
+        this.sm.closeAllModals();
         // 离开时归还方块到对象池；作品纹理保留（收藏册等仍会用到）
         this.board.clear();
         this.gm.textures.releasePrefix('piece:');
@@ -156,6 +190,13 @@ export class GamePage extends BasePage {
 
     // ------------------------------------------------------------ 操作
 
+    /** 教程第 3 步期间，其它按钮暂时不可用（避免玩家误触而打断教程） */
+    private tutLocked(): boolean {
+        if (!this.tut) return false;
+        this.sm.toast('先完成教程里的交换吧，或点“跳过教程”', 1.4);
+        return true;
+    }
+
     private onSwap(o: SwapOutcome, a: number, b: number): void {
         const gm = this.gm;
         gm.audio.play('swap', 0.6);
@@ -169,12 +210,13 @@ export class GamePage extends BasePage {
             }
         }
         this.refreshHud(true);
+        if (this.tut && this.tut.step === 3) this.completeTutorialMove();
         if (o.solved) this.finish();
     }
 
     private useHint(): void {
         const gm = this.gm;
-        if (!this.pm || this.pm.finished) return;
+        if (!this.pm || this.pm.finished || this.tutLocked()) return;
         if (this.pm.hintsLeft <= 0) {
             if (gm.ads.isRewardedAvailable()) {
                 this.sm.confirm('提示用完啦', '观看一段激励视频，可获得 1 次额外提示（不看也不影响继续游戏）。', [
@@ -208,19 +250,20 @@ export class GamePage extends BasePage {
     }
 
     private undo(): void {
-        if (!this.pm) return;
+        if (!this.pm || this.tutLocked()) return;
         const r = this.pm.undo();
         if (!r) {
             this.sm.toast('没有可以撤销的操作');
             return;
         }
         this.gm.audio.play('swap', 0.5);
+        this.board.resetGuide();
         this.board.applyVisualSwap(r[0], r[1], 0.18);
         this.refreshHud(true);
     }
 
     private setPeek(show: boolean): void {
-        if (!this.pm || this.pm.finished) {
+        if (!this.pm || this.pm.finished || (show && this.tut)) {
             this.board.setPeek(false);
             return;
         }
@@ -236,6 +279,7 @@ export class GamePage extends BasePage {
 
     private openPause(): void {
         if (!this.pm || this.pm.finished || this.paused) return;
+
         this.paused = true;
         this.pauseTimer(true);
         this.refreshHud(true);
@@ -256,7 +300,8 @@ export class GamePage extends BasePage {
         this.paused = false;
         if (this.pm && !this.pm.finished) {
             this.pauseTimer(false);
-            this.board.setEnabled(true);
+            // 教程第 1、2、4 步棋盘不可操作，只有第 3 步（或没有教程）才恢复
+            if (!this.tut || this.tut.step === 3) this.board.setEnabled(true);
         }
     }
 
@@ -292,7 +337,10 @@ export class GamePage extends BasePage {
         this.scheduleCall(0.6, () => this.fx.confetti(this.L.w, this.L.h / 2, bp.y - 200, 46));
         gm.analytics.track('puzzle_complete', { mode: this.session.mode, grid: result.grid, time: Math.round(result.timeMs / 1000), moves: result.moves });
         const payload: ResultPayload = { session: this.session, result };
-        this.scheduleCall(1.6, () => this.sm.go('result', payload, { replace: true }));
+        const goResult = () => this.sm.go('result', payload, { replace: true });
+        // 教程庆祝卡片还在时，等玩家点“看结果”再进入结算页
+        if (this.tut) this.tutAfter = goResult;
+        else this.scheduleCall(1.6, goResult);
     }
 
     // ------------------------------------------------------------ HUD
@@ -334,58 +382,201 @@ export class GamePage extends BasePage {
         g.fill();
     }
 
-    // ------------------------------------------------------------ 新手教程
+    // ------------------------------------------------------------ 参考图放大
 
-    private showTutorial(): void {
+    private openReference(): void {
+        if (!this.pm || this.tut || this.paused) return;
         const gm = this.gm;
-        this.pauseTimer(true);
-        const L = this.L;
-        const node = makeNode('Tutorial', this.root, L.fullW, L.fullH);
-        node.addComponent(BlockInputEvents);
-        const dim = node.addComponent(Graphics);
-        dim.fillColor = hex(P.ink, 110);
-        dim.rect(-L.fullW / 2, -L.fullH / 2, L.fullW, L.fullH);
-        dim.fill();
-        const bp = this.board.node.position;
-        const c0 = this.board.center(0), c1 = this.board.center(Math.min(5, this.pm!.n - 1));
-        const hand = sprite(node, gm.textures.icon('hand', P.ink, P.white), 64, 64, bp.x + c0.x + 20, bp.y + c0.y - 20).node;
-        tween(hand)
-            .repeatForever(
-                tween(hand)
-                    .set({ position: new Vec3(bp.x + c0.x + 20, bp.y + c0.y - 20, 0) })
-                    .to(0.2, { scale: new Vec3(0.85, 0.85, 1) })
-                    .to(0.8, { position: new Vec3(bp.x + c1.x + 20, bp.y + c1.y - 20, 0) }, { easing: 'sineInOut' })
-                    .to(0.2, { scale: new Vec3(1, 1, 1) })
-                    .delay(0.4),
-            )
-            .start();
-        const cardY = -L.h / 2 + L.safeBottom + 220;
-        const card = panel(node, L.w - 80, 260, { fill: P.cream, border: P.ink, shadow: P.ink, step: Theme.px, shadowDepth: 2 }, 0, cardY);
-        label(card, '玩法小提示', Theme.font.h2, { bold: true }).node.setPosition(0, 86);
-        const tip = label(card, '按住方块拖到另一个方块上就能交换位置，\n也可以先点一块、再点另一块。\n放对的方块会锁定，全部归位就完成啦！', Theme.font.small, { color: P.ink2, width: L.w - 140, wrap: true });
-        tip.node.setPosition(0, 10);
-        button(card, {
-            w: 260,
-            h: 80,
-            text: '知道啦',
-            style: 'primary',
-            onClick: () => {
-                gm.save.mutate((d) => (d.tutorial.puzzleBasics = true), true);
-                this.closeTutorial();
-            },
-        }, 0, -86);
-        this.tutorialNode = node;
-        opacityOf(node).opacity = 0;
-        tween(opacityOf(node)).to(0.2, { opacity: 255 }).start();
+        const w = Math.min(this.L.w - 60, 640);
+        const art = Math.min(w - 90, 540);
+        const h = art + 300;
+        const card = this.sm.openModal(w, h);
+        label(card, '目标图片', Theme.font.h2, { bold: true }).node.setPosition(0, h / 2 - 54);
+        artFrame(card, gm.textures.art(this.pm.spec.imageId), art, 0, h / 2 - 54 - 30 - art / 2 - 10, 'pink');
+        label(card, '按照这张图把方块换回原来的位置', Theme.font.small, { color: P.ink2 }).node.setPosition(0, -h / 2 + 135);
+        button(card, { w: w - 120, h: 80, text: '知道了', style: 'primary', onClick: () => this.sm.closeModal() }, 0, -h / 2 + 62);
     }
 
-    private closeTutorial(): void {
-        if (!this.tutorialNode) return;
-        this.tutorialNode.children.forEach((c) => Tween.stopAllByTarget(c));
-        this.tutorialNode.destroy();
-        this.tutorialNode = null;
-        // 教程期间未开始计时，这里无需恢复（计时从第一次触碰开始）
-        if (this.pm && this.pm.timer.started) this.pauseTimer(false);
+    // ------------------------------------------------------------ 交互式新手教程
+
+    /** 用真实题目里的一对错位方块教学：不消耗提示、不写死格子编号 */
+    private startTutorial(): void {
+        const pm = this.pm;
+        if (!pm) return;
+        const hint = pm.peekHint();
+        if (!hint) return;
+        this.pauseTimer(true);
+        this.board.setEnabled(false);
+        this.tut = { step: 1, pair: [hint.fromCell, hint.toCell] };
+        const layer = makeNode('Tutorial', this.root, 0, 0);
+        layer.setSiblingIndex(this.fxLayer.getSiblingIndex());
+        this.tutLayer = layer;
+        this.tutorialStep(1);
+    }
+
+    private addBlocker(x0: number, y0: number, x1: number, y1: number, dim: boolean): void {
+        const w = x1 - x0, h = y1 - y0;
+        if (w <= 0 || h <= 0 || !this.tutLayer) return;
+        const n = makeNode('Blk', this.tutLayer, w, h, (x0 + x1) / 2, (y0 + y1) / 2);
+        n.addComponent(BlockInputEvents);
+        if (dim) {
+            const g = n.addComponent(Graphics);
+            g.fillColor = hex(P.ink, 135);
+            g.rect(-w / 2, -h / 2, w, h);
+            g.fill();
+        }
+    }
+
+    /** 全屏压暗，只留一个“聚光灯”洞；blockHole=true 时洞里也不可操作 */
+    private spotlight(r: { x: number; y: number; w: number; h: number } | null, blockHole: boolean, padX = 10, padY = 10): void {
+        const L = this.L;
+        const X0 = -L.fullW / 2, X1 = L.fullW / 2, Y0 = -L.fullH / 2, Y1 = L.fullH / 2;
+        if (!r) {
+            this.addBlocker(X0, Y0, X1, Y1, true);
+            return;
+        }
+        const hx0 = r.x - r.w / 2 - padX, hx1 = r.x + r.w / 2 + padX, hy0 = r.y - r.h / 2 - padY, hy1 = r.y + r.h / 2 + padY;
+        this.addBlocker(X0, hy1, X1, Y1, true);
+        this.addBlocker(X0, Y0, X1, hy0, true);
+        this.addBlocker(X0, hy0, hx0, hy1, true);
+        this.addBlocker(hx1, hy0, X1, hy1, true);
+        if (blockHole) this.addBlocker(hx0, hy0, hx1, hy1, false);
+        // 聚光灯黄色边框
+        const frame = makeNode('Frame', this.tutLayer, hx1 - hx0, hy1 - hy0, (hx0 + hx1) / 2, (hy0 + hy1) / 2);
+        const g = frame.addComponent(Graphics);
+        const w = hx1 - hx0, h = hy1 - hy0, t = 6;
+        g.fillColor = hex(P.yellow);
+        g.rect(-w / 2, h / 2 - t, w, t);
+        g.rect(-w / 2, -h / 2, w, t);
+        g.rect(-w / 2, -h / 2 + t, t, h - t * 2);
+        g.rect(w / 2 - t, -h / 2 + t, t, h - t * 2);
+        g.fill();
+    }
+
+    private clearTutorialLayer(): void {
+        if (!this.tutLayer) return;
+        this.tutLayer.destroyAllChildren();
+        this.tutCard = null;
+        this.tutBody = null;
+    }
+
+    /**
+     * 教程卡片：标题 / 正文（顶部对齐）/ 主按钮（底部）/ 右上角“跳过教程”。
+     * 卡片高度必须容得下正文：h ≥ 84（标题区）+ 正文高度 + 104（按钮区）。
+     */
+    private coachCard(cy: number, h: number, title: string, body: string, primary: { text: string; onClick: () => void } | null, skip: boolean): void {
+        const gm = this.gm;
+        const w = Math.min(this.L.w - 60, 660);
+        const card = panel(this.tutLayer!, w, h, { fill: P.cream, border: P.ink, shadow: P.ink, step: Theme.px, shadowDepth: 2 }, 0, cy);
+        card.addComponent(BlockInputEvents);
+        label(card, title, Theme.font.h2 - 2, { bold: true, color: P.rose2 }).node.setPosition(0, h / 2 - 42);
+        const b = label(card, body, Theme.font.small + 2, { color: P.ink, width: w - 64, wrap: true, lineHeight: 1.4 });
+        b.node.getComponent(UITransform)!.setAnchorPoint(0.5, 1);
+        b.node.setPosition(0, h / 2 - 84);
+        this.tutBody = b;
+        if (skip) button(card, { w: 150, h: 44, text: '跳过教程', fontSize: Theme.font.small - 4, style: 'ghost', onClick: () => this.skipTutorial() }, w / 2 - 98, h / 2 - 36);
+        if (primary) button(card, { w: w - 120, h: 72, text: primary.text, style: 'primary', onClick: primary.onClick }, 0, -h / 2 + 16 + 36);
+        this.tutCard = card;
+        const op = opacityOf(card);
+        op.opacity = 0;
+        tween(op).to(0.18, { opacity: 255 }).start();
+        gm.audio.play('pick', 0.4);
+    }
+
+    private tutorialStep(step: 1 | 2 | 3 | 4): void {
+        if (!this.tut) return;
+        this.tut.step = step;
+        this.clearTutorialLayer();
+        const L = this.L;
+        // 卡片可以盖住被压暗的标题栏，这样棋盘上方有足够空间放文字
+        const topY = L.headerY + 36;
+        if (step === 1) {
+            this.board.setTutorialPair(null);
+            this.spotlight(this.refRect, true, 10, 34);
+            const h = 320;
+            this.coachCard(this.boardRect.y + 150, h, '第一步：看看目标', '这就是你最终需要拼出来的图片。\n它会一直显示在左上角，随时对照，点一下还能放大。', { text: '下一步', onClick: () => this.tutorialStep(2) }, true);
+        } else if (step === 2) {
+            this.board.setTutorialPair(this.tut.pair);
+            this.spotlight(this.boardRect, true);
+            const h = 310;
+            this.coachCard(topY - h / 2, h, '第二步：认识交换', '找到位置不对的方块，点击它，再点击它应该去的位置，就可以交换啦！\n粉框是要动的方块，绿框是它的家。', { text: '我来试试', onClick: () => this.tutorialStep(3) }, true);
+        } else if (step === 3) {
+            // 只压暗棋盘以外的区域；棋盘本身可以操作，但只允许这一对方块
+            this.board.setEnabled(true);
+            this.board.setTutorialPair(this.tut.pair);
+            this.spotlight(this.boardRect, false);
+            const h = 220;
+            this.coachCard(topY - h / 2, h, '第三步：你来试试', '先点粉框的方块，再点绿框的位置。\n也可以直接把粉框方块拖到绿框里。', null, true);
+        } else {
+            this.board.setTutorialPair(null);
+            this.spotlight(null, true);
+        }
+    }
+
+    /** 教程中碰了不该碰的方块：温和提示，不惩罚 */
+    private onTutorialMistake(): void {
+        if (!this.tut || this.tut.step !== 3) return;
+        this.gm.audio.play('error', 0.5);
+        if (this.tutBody) this.tutBody.string = '这块暂时不用动哦～\n请先点粉框的方块，再点绿框的位置。';
+        if (this.tutCard) {
+            Tween.stopAllByTarget(this.tutCard);
+            this.tutCard.setPosition(0, this.tutCard.position.y, 0);
+            tween(this.tutCard).to(0.05, { position: new Vec3(-10, this.tutCard.position.y, 0) }).to(0.08, { position: new Vec3(10, this.tutCard.position.y, 0) }).to(0.05, { position: new Vec3(0, this.tutCard.position.y, 0) }).start();
+        }
+    }
+
+    /** 玩家完成了教程里的交换（真实的一步，不会自动代劳） */
+    private completeTutorialMove(): void {
+        if (!this.tut) return;
+        this.tut.step = 4;
+        this.gm.save.mutate((d) => (d.tutorial.puzzleBasics = true), true);
+        this.board.setTutorialPair(null);
+        this.board.setEnabled(false);
+        this.clearTutorialLayer();
+        this.scheduleCall(0.8, () => this.showCelebration());
+    }
+
+    private showCelebration(): void {
+        if (!this.tut || !this.tutLayer) return;
+        const solved = !!this.pm && this.pm.finished;
+        this.clearTutorialLayer();
+        this.spotlight(null, true);
+        const h = 340;
+        this.coachCard(this.boardRect.y + 40, h, '太棒了！', solved ? '你学会啦！这张小拼图已经完成。\n以后遇到更多方块，也是同样的玩法～' : '你学会基本玩法啦！\n接下来把剩下的方块都换回原位吧。', {
+            text: solved ? '看结果' : '继续拼图',
+            onClick: () => this.endTutorial(),
+        }, false);
+        this.gm.audio.play('star', 0.8);
+        this.fx.confetti(this.L.w, this.boardRect.y + 300, this.boardRect.y - 300, 30);
+    }
+
+    private endTutorial(): void {
+        const after = this.tutAfter;
+        this.closeTutorial(true);
+        if (after) after();
+    }
+
+    private skipTutorial(): void {
+        this.gm.save.mutate((d) => (d.tutorial.puzzleBasics = true), true);
+        this.closeTutorial(true);
+    }
+
+    private closeTutorial(resume: boolean): void {
+        if (this.tutLayer) {
+            this.tutLayer.destroy();
+            this.tutLayer = null;
+        }
+        this.tutCard = null;
+        this.tutBody = null;
+        this.tutAfter = null;
+        const wasActive = !!this.tut;
+        this.tut = null;
+        if (!wasActive) return;
+        this.board.setTutorialPair(null);
+        if (resume && this.pm && !this.pm.finished) {
+            this.board.setEnabled(true);
+            if (this.pm.timer.started) this.pauseTimer(false);
+        }
     }
 
     private scheduleCall(delay: number, fn: () => void): void {

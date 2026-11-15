@@ -1,4 +1,4 @@
-import { DIFFICULTIES, GridSize, isGridSize } from '../config/GameConfig';
+import { DIFFICULTIES, GridSize, isGridSize, maxSwaps } from '../config/GameConfig';
 import { SeededRandom } from '../core/Random';
 import { shuffleOrder } from './PuzzleShuffle';
 import { isPermutation } from './PuzzleValidator';
@@ -22,9 +22,13 @@ export interface PuzzleSpec {
     imageId: string;
     grid: GridSize;
     seed: number;
+    /** 可选：覆盖难度配置的交换次数（仅新手渐进使用；挑战/每日不设置，保证两端布局一致） */
+    swaps?: number;
 }
 
 export interface PuzzleLayout extends PuzzleSpec {
+    /** 实际使用的交换次数 */
+    swaps: number;
     /** order[cell] = 位于该格子的方块 ID */
     order: number[];
 }
@@ -34,8 +38,9 @@ export function generateLayout(spec: PuzzleSpec): PuzzleLayout {
     if (!spec.imageId) throw new Error('缺少图片 ID');
     const n = spec.grid * spec.grid;
     const rng = new SeededRandom(spec.seed >>> 0);
-    const order = shuffleOrder(n, rng, DIFFICULTIES[spec.grid].scramble);
-    return { imageId: spec.imageId, grid: spec.grid, seed: spec.seed >>> 0, order };
+    const swaps = Math.max(1, Math.min(maxSwaps(spec.grid), spec.swaps ?? DIFFICULTIES[spec.grid].swaps));
+    const order = shuffleOrder(n, rng, swaps);
+    return { imageId: spec.imageId, grid: spec.grid, seed: spec.seed >>> 0, swaps, order };
 }
 
 /** 由布局生成方块数据列表（按方块 ID 排序） */
