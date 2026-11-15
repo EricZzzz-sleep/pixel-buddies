@@ -64,6 +64,10 @@ export interface Capabilities {
     chooseImage: boolean;
     /** 能把 2D 绘制结果导出为本地图片作为分享图 */
     shareImage: boolean;
+    /** 平台官方数据上报接口（wx.reportEvent / tt.reportAnalytics） */
+    analyticsReport: boolean;
+    /** 可向开发者服务器发起 HTTPS 请求（排行榜等） */
+    request: boolean;
 }
 
 export interface RewardedAdResult {
@@ -94,6 +98,18 @@ export interface DecodedImage {
     width: number;
     height: number;
     data: Uint8Array;
+}
+
+export interface HttpRequest {
+    url: string;
+    method?: 'GET' | 'POST';
+    body?: Record<string, unknown>;
+    timeoutMs?: number;
+}
+
+export interface HttpResponse {
+    status: number;
+    data: unknown;
 }
 
 export interface PlatformAdapter {
@@ -128,6 +144,11 @@ export interface PlatformAdapter {
      * draw 收到的是标准 2D 上下文。
      */
     renderShareImage(draw: (ctx: any) => void, width: number, height: number): string | null;
+
+    /** 向平台数据分析上报一个事件；不支持时静默忽略。事件需先在平台后台配置才会入库 */
+    reportEvent(name: string, data: Record<string, string | number | boolean>): void;
+    /** 发起 HTTPS 请求；不支持、超时或网络错误时返回 null（不抛异常） */
+    request(opts: HttpRequest): Promise<HttpResponse | null>;
 
     /** 广告位为空或平台不支持时返回 null */
     createRewardedAd(adUnitId: string): RewardedAdHandle | null;

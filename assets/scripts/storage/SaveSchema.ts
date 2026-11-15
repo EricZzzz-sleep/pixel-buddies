@@ -5,10 +5,11 @@
  * - v1：早期原型格式（扁平的 best 表 + unlocked 数组 + sound 开关）。保留迁移以演示/保障兼容。
  * - v2：加入像素工坊作品与授权记录。
  * - v3：加入主题系列奖励（rewards）。
+ * - v4：加入成长系统（经验/任务/周挑战/成就，progress）与广告频控（ads）。
  * 新增字段时：提升 SAVE_VERSION，在 migrate() 中补默认值，绝不直接丢弃旧数据。
  */
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export interface LevelRecord {
     bestTimeMs: number;
@@ -59,6 +60,44 @@ export interface SeriesRewardRecord {
     seen: boolean;
 }
 
+/** 每日任务/周目标中的一项进度 */
+export interface GoalState {
+    id: string;
+    progress: number;
+    claimed: boolean;
+}
+
+/** 成长系统存档：全部本地，可由旧存档的成绩补算（见 ProgressManager.bootstrap） */
+export interface ProgressState {
+    /** 是否已用旧存档补算过经验与统计 */
+    initialized: boolean;
+    xp: number;
+    stats: {
+        puzzlesCompleted: number;
+        threeStars: number;
+        dailyChallenges: number;
+        missionDays: number;
+        weeklyCompleted: number;
+        friendChallenges: number;
+        friendWins: number;
+    };
+    missions: { dateKey: string; items: GoalState[]; bonusClaimed: boolean; counted: boolean };
+    weekly: { weekKey: string; items: GoalState[]; completed: boolean; completeClaimed: boolean };
+    weeklyHistory: Array<{ weekKey: string; theme: string; completedAt: number }>;
+    achievements: Record<string, { at: number; claimed: boolean }>;
+    /** 已发放过经验的事件键（防止重复刷经验），有上限，先进先出 */
+    awarded: string[];
+}
+
+/** 广告频控（插屏只在自然转场出现） */
+export interface AdState {
+    dateKey: string;
+    shownToday: number;
+    lastShownAt: number;
+    /** 自然转场的计数（用于“不是每局都弹”） */
+    transitions: number;
+}
+
 export interface Settings {
     music: boolean;
     sfx: boolean;
@@ -90,6 +129,21 @@ export interface SaveData {
     consent: { photo: boolean };
     /** 系列奖励：seriesId → 记录。只增不减，保证不会重复发放 */
     rewards: Record<string, SeriesRewardRecord>;
+    progress: ProgressState;
+    ads: AdState;
+}
+
+export function createDefaultProgress(): ProgressState {
+    return {
+        initialized: false,
+        xp: 0,
+        stats: { puzzlesCompleted: 0, threeStars: 0, dailyChallenges: 0, missionDays: 0, weeklyCompleted: 0, friendChallenges: 0, friendWins: 0 },
+        missions: { dateKey: '', items: [], bonusClaimed: false, counted: false },
+        weekly: { weekKey: '', items: [], completed: false, completeClaimed: false },
+        weeklyHistory: [],
+        achievements: {},
+        awarded: [],
+    };
 }
 
 export function createDefaultSave(now: number): SaveData {
@@ -110,6 +164,8 @@ export function createDefaultSave(now: number): SaveData {
         custom: [],
         consent: { photo: false },
         rewards: {},
+        progress: createDefaultProgress(),
+        ads: { dateKey: '', shownToday: 0, lastShownAt: 0, transitions: 0 },
     };
 }
 
@@ -165,6 +221,25 @@ function migrateV1(old: SaveDataV1, now: number): SaveData {
     return s;
 }
 
+function goals(v: unknown): GoalState[] {
+    if (!Array.isArray(v)) return [];
+    return v.filter((g: any) => isObj(g) && typeof g.id === 'string').map((g: any) => ({ id: g.id, progress: num(g.progress, 0), claimed: bool(g.claimed, false) }));
+}
+
+/** 成长数据逐字段规范化：缺什么补什么，坏数据丢弃，绝不抛错 */
+function normalizeProgress(p: any): ProgressState {
+    const d = createDefaultProgress();
+    d.initialized = bool(p.initialized, false);
+    d.xp = Math.max(0, num(p.xp, 0));
+    if (isObj(p.stats)) for (const k of Object.keys(d.stats) as Array<keyof ProgressState['stats']>) d.stats[k] = Math.max(0, num(p.stats[k], 0));
+    if (isObj(p.missions)) d.missions = { dateKey: typeof p.missions.dateKey === 'string' ? p.missions.dateKey : '', items: goals(p.missions.items), bonusClaimed: bool(p.missions.bonusClaimed, false), counted: bool(p.missions.counted, false) };
+    if (isObj(p.weekly)) d.weekly = { weekKey: typeof p.weekly.weekKey === 'string' ? p.weekly.weekKey : '', items: goals(p.weekly.items), completed: bool(p.weekly.completed, false), completeClaimed: bool(p.weekly.completeClaimed, false) };
+    if (Array.isArray(p.weeklyHistory)) d.weeklyHistory = p.weeklyHistory.filter((h: any) => isObj(h) && typeof h.weekKey === 'string').map((h: any) => ({ weekKey: h.weekKey, theme: String(h.theme || ''), completedAt: num(h.completedAt, 0) })).slice(-26);
+    if (isObj(p.achievements)) for (const k of Object.keys(p.achievements)) { const a = p.achievements[k]; if (isObj(a) && typeof a.at === 'number') d.achievements[k] = { at: a.at, claimed: bool(a.claimed, false) }; }
+    if (Array.isArray(p.awarded)) d.awarded = p.awarded.filter((k: any) => typeof k === 'string').slice(-300);
+    return d;
+}
+
 /**
  * 把任意来源的数据规范化为当前版本存档。
  * - 未知/损坏数据 → 返回 null，由调用方备份原文后重建。
@@ -201,6 +276,10 @@ export function migrate(raw: unknown, now: number): SaveData | null {
         );
     }
     if (isObj(data.consent)) d.consent.photo = bool(data.consent.photo, false);
+    if (isObj(data.progress)) d.progress = normalizeProgress(data.progress);
+    if (isObj(data.ads)) {
+        d.ads = { dateKey: typeof data.ads.dateKey === 'string' ? data.ads.dateKey : '', shownToday: num(data.ads.shownToday, 0), lastShownAt: num(data.ads.lastShownAt, 0), transitions: num(data.ads.transitions, 0) };
+    }
     if (isObj(data.rewards)) {
         for (const k of Object.keys(data.rewards)) {
             const r = data.rewards[k];

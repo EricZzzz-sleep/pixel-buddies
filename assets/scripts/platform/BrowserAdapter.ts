@@ -4,6 +4,8 @@ import {
     ChosenImage,
     DecodedImage,
     Insets,
+    HttpRequest,
+    HttpResponse,
     InterstitialAdHandle,
     LaunchInfo,
     MenuButtonRect,
@@ -68,6 +70,8 @@ export class BrowserAdapter implements PlatformAdapter {
             vibrate: !!(nav && typeof nav.vibrate === 'function'),
             rewardedAd: false,
             interstitialAd: false,
+            analyticsReport: false,
+            request: typeof (this.win && this.win.fetch) === 'function',
             chooseImage: !!(this.win && this.win.document),
             shareImage: false,
         };
@@ -172,6 +176,35 @@ export class BrowserAdapter implements PlatformAdapter {
     renderShareImage(): string | null {
         // Web 分享是复制挑战码，不需要分享图
         return null;
+    }
+
+    reportEvent(): void {
+        /* Web 预览不上报 */
+    }
+
+    async request(opts: HttpRequest): Promise<HttpResponse | null> {
+        const f = this.win && this.win.fetch;
+        if (typeof f !== 'function') return null;
+        try {
+            const ctl = typeof this.win.AbortController === 'function' ? new this.win.AbortController() : null;
+            const timer = ctl ? this.win.setTimeout(() => ctl.abort(), opts.timeoutMs || 8000) : 0;
+            const r = await f.call(this.win, opts.url, {
+                method: opts.method || 'GET',
+                headers: { 'content-type': 'application/json' },
+                body: opts.body ? JSON.stringify(opts.body) : undefined,
+                signal: ctl ? ctl.signal : undefined,
+            });
+            if (timer) this.win.clearTimeout(timer);
+            let data: unknown = null;
+            try {
+                data = await r.json();
+            } catch {
+                /* 非 JSON 响应 */
+            }
+            return { status: r.status, data };
+        } catch {
+            return null;
+        }
     }
 
     createRewardedAd(): RewardedAdHandle | null {

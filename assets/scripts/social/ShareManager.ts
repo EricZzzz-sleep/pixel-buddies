@@ -12,6 +12,9 @@ import { ChallengeManager } from './ChallengeManager';
  * 只能在玩家点击按钮的回调中调用 shareXXX（抖音会拒绝非用户触发的分享）。
  */
 export class ShareManager {
+    /** 每次点击分享时回调（用于统计 share_clicked）；kind 为分享卡片类型 */
+    onShare: ((kind: string) => void) | null = null;
+
     constructor(private readonly platform: PlatformAdapter, private readonly challenges: ChallengeManager) {}
 
     /** 注册右上角菜单的默认分享内容（不带挑战数据） */
@@ -27,6 +30,7 @@ export class ShareManager {
     }
 
     shareChallenge(d: ChallengeData): Promise<ShareResult> {
+        this.onShare?.('challenge');
         const art = getArt(d.imageId);
         const name = art ? art.name : '像素拼图';
         const diff = DIFFICULTIES[d.grid];
@@ -52,6 +56,7 @@ export class ShareManager {
     }
 
     shareDailyResult(dateKey: string, imageName: string, timeMs: number, moves: number, stars: number, imageId?: string): Promise<ShareResult> {
+        this.onShare?.('daily');
         const title = `每日挑战 ${dateKey.slice(5).replace('-', '月')}日「${imageName}」${'★'.repeat(stars)} 用时 ${formatDuration(timeMs)}`;
         const imageUrl = imageId
             ? this.cardImage({
@@ -69,6 +74,22 @@ export class ShareManager {
             desc: '像素搭子 · 每日挑战',
             query: 'from=daily',
             fallbackText: `${title}，${moves} 步。来《像素搭子》挑战今天的拼图吧！`,
+        });
+    }
+
+    /**
+     * 通用成长卡片：普通拼图成绩 / 升级 / 成就 / 周挑战 / 收藏集齐 / 个人名片。
+     * 全部走同一张像素卡片绘制（Web 或不支持生成图片时回退为文字分享），不上传任何个人信息。
+     */
+    shareCardOf(kind: 'result' | 'levelup' | 'achievement' | 'weekly' | 'collection' | 'profile', o: { artId: string; title: string; subtitle: string; stars?: number; lines: string[]; footer: string; text: string }): Promise<ShareResult> {
+        this.onShare?.(kind);
+        const imageUrl = this.cardImage({ art: renderArt(o.artId), title: o.title, subtitle: o.subtitle, stars: o.stars || 0, lines: o.lines, footer: o.footer });
+        return this.platform.share({
+            title: o.text,
+            imageUrl,
+            desc: '像素搭子',
+            query: `from=${kind}`,
+            fallbackText: `${o.text}\n来《像素搭子》一起拼图吧！`,
         });
     }
 }

@@ -79,6 +79,10 @@
 
 ---
 
+## 2.1 V3–V5 升级（留存 / 社交 / 变现）
+每日任务、每周挑战、等级经验、成就、个人资料、挑战记录与排行（本地/服务器明确区分）、广告频控与统计埋点。详见：
+[功能说明](docs/V3-V5_FEATURES.md) · [存档迁移](docs/SAVE_MIGRATION.md) · [广告接入](docs/ADS_SETUP.md) · [统计埋点](docs/ANALYTICS.md) · [排行榜后端契约](docs/leaderboard-backend.md)。广告默认关闭，统计默认不上传。
+
 ## 3. 打开与运行
 
 ### 3.1 环境

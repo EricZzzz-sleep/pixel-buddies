@@ -1,3 +1,4 @@
+import { LocalLeaderboard } from '../../assets/scripts/social/LeaderboardService';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ChallengeManager } from '../../assets/scripts/social/ChallengeManager';
@@ -70,7 +71,7 @@ test('挑战对比：胜负平与无对手成绩', () => {
     assert.equal(cm.compare(d, { timeMs: 60020, moves: 20 }).outcome, 'draw');
     assert.equal(cm.compare(d, { timeMs: 60000, moves: 18 }).outcome, 'win');
     assert.equal(cm.compare(cm.create('bunny', 4, 1), { timeMs: 1, moves: 1 }).outcome, 'solo');
-    assert.equal(cm.leaderboard.online, false, '无后端时明确为离线');
+    assert.equal(new LocalLeaderboard(() => null).serverBacked, false, '无后端时明确为本地榜');
 });
 
 test('平台识别：没有 wx/tt 时使用 Web 适配，不崩溃', () => {

@@ -1,5 +1,4 @@
 import { CHALLENGE, GridSize } from '../config/GameConfig';
-import { RELEASE } from '../config/PlatformConfig';
 import { randomSeed } from '../core/Random';
 import { PuzzleResult } from '../puzzle/PuzzleScoring';
 import { SaveManager } from '../storage/SaveManager';
@@ -14,26 +13,6 @@ export interface ChallengeComparison {
 }
 
 /**
- * 服务器排行榜预留接口：第一版无后端，使用 LocalOnlyLeaderboard 明确返回“未接入”。
- * 接入服务器后实现 submit/fetch 即可，界面层无需修改。
- */
-export interface LeaderboardService {
-    readonly online: boolean;
-    submit(challengeCode: string, result: { timeMs: number; moves: number }): Promise<boolean>;
-    fetchTop(challengeCode: string): Promise<Array<{ name: string; timeMs: number; moves: number }> | null>;
-}
-
-export class LocalOnlyLeaderboard implements LeaderboardService {
-    readonly online = false;
-    submit(): Promise<boolean> {
-        return Promise.resolve(false);
-    }
-    fetchTop(): Promise<null> {
-        return Promise.resolve(null);
-    }
-}
-
-/**
  * 异步好友挑战：
  * 1. 发起者选图和难度 → create() 生成固定种子；
  * 2. 发起者完成后 withResult() 把成绩写进挑战数据 → 分享；
@@ -41,9 +20,6 @@ export class LocalOnlyLeaderboard implements LeaderboardService {
  * 4. 好友完成后 compare() 展示双方成绩（对方成绩来自分享数据本身，不伪造）。
  */
 export class ChallengeManager {
-    /** 第一版无后端：RELEASE.leaderboardEndpoint 为空，始终使用本地实现；接入服务器时在此替换为网络实现 */
-    readonly leaderboard: LeaderboardService = new LocalOnlyLeaderboard();
-    readonly hasServer = !!RELEASE.leaderboardEndpoint;
     /** 等待处理的外部挑战（从分享入口进入时设置） */
     pendingIncoming: ChallengeData | null = null;
 

@@ -407,6 +407,7 @@ export class GamePage extends BasePage {
         if (!pm) return;
         const hint = pm.peekHint();
         if (!hint) return;
+        this.gm.analytics.trackOnce('tutorial_started', 'tutorial_started');
         this.pauseTimer(true);
         this.board.setEnabled(false);
         this.tut = { step: 1, pair: [hint.fromCell, hint.toCell] };
@@ -533,6 +534,7 @@ export class GamePage extends BasePage {
         if (!this.tut) return;
         this.tut.step = 4;
         this.gm.save.mutate((d) => (d.tutorial.puzzleBasics = true), true);
+        this.gm.analytics.trackOnce('tutorial_completed', 'tutorial_completed');
         this.board.setTutorialPair(null);
         this.board.setEnabled(false);
         this.clearTutorialLayer();

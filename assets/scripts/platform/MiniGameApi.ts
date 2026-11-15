@@ -99,6 +99,8 @@ export interface WxApi {
     } & MGCallbackOption<{ tempFiles: Array<{ tempFilePath: string; size: number }> }>): void;
     createImage?(): MGImage;
     createCanvas?(): MGCanvas;
+    reportEvent?(eventId: string, data?: Record<string, any>): void;
+    request?(opt: { url: string; method?: 'GET' | 'POST'; data?: string | Record<string, any>; timeout?: number; header?: Record<string, string> } & MGCallbackOption<{ statusCode: number; data: any }>): void;
 }
 
 /** 抖音小游戏 tt 子集 */
@@ -122,6 +124,8 @@ export interface TtApi {
     chooseImage?(opt: { count?: number; sizeType?: string[]; sourceType?: string[] } & MGCallbackOption<{ tempFilePaths: string[] }>): void;
     createImage?(): MGImage;
     createCanvas?(): MGCanvas;
+    reportAnalytics?(name: string, data: Record<string, any>): void;
+    request?(opt: { url: string; method?: 'GET' | 'POST'; data?: string | Record<string, any>; timeout?: number; header?: Record<string, string> } & MGCallbackOption<{ statusCode: number; data: any }>): void;
 }
 
 /** 安全获取全局对象：Web 环境下返回 null，绝不直接引用未定义的 wx/tt 标识符 */

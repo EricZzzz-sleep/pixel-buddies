@@ -13,6 +13,9 @@ import { button, label, makeNode, onTap, panel, popIn, sprite } from '../ui/UIKi
 import { BasePage } from './BasePage';
 import { SeriesUpdate } from '../collection/CollectionManager';
 import { artFrame, fmtDate, Flow, openDifficultySheet, segmentBar, starFrames } from './PageKit';
+import { AchievementDef } from '../progress/ProgressConfig';
+import { NextStep, ProgressUpdate } from '../progress/ProgressManager';
+import { showAchievementUnlocked, showLevelUp, showWeeklyComplete, xpBar } from './GrowthKit';
 
 /**
  * 结算页：作品展示、星级动画、用时/步数/提示、最佳成绩与新纪录；
@@ -48,6 +51,20 @@ export class ResultPage extends BasePage {
         if (session.mode === 'challenge-create' && session.challenge) shareData = gm.challenges.withResult(session.challenge, result);
         gm.save.flush();
 
+        // 成长系统：经验/任务/周挑战/成就（只在这里结算一次；重复完成同图不会重复发经验）
+        const pu = gm.progress.onPuzzleCompleted({ result, rec, mode: session.mode, dateKey: session.dateKey });
+        let fu: ProgressUpdate | null = null;
+        if (compare && session.challenge) {
+            fu = gm.progress.onFriendChallengeCompleted(gm.challenges.encode(session.challenge), compare.outcome === 'win');
+            gm.analytics.track('friend_challenge_completed', { outcome: compare.outcome, grid: result.grid });
+        }
+        if (session.mode === 'challenge-create') gm.analytics.track('friend_challenge_created', { grid: result.grid });
+        const growth = this.mergeGrowth(pu, fu);
+        // 每日挑战成绩提交到排行榜服务（本地榜不会上传；服务器榜由服务器校验）
+        if (daily && session.dateKey) {
+            gm.leaderboard.submit({ board: 'daily', key: session.dateKey, imageId: result.imageId, grid: result.grid, seed: session.spec.seed, timeMs: result.timeMs, moves: result.moves, hintsUsed: result.hintsUsed });
+        }
+
         // 收藏事件：只有“首次解锁”才记录解锁/系列进度；重复完成不会重复触发
         const ser = rec.series;
         if (ser && rec.newlyCollected) {
@@ -75,7 +92,7 @@ export class ResultPage extends BasePage {
         const shareH = hasShare ? 120 + (session.mode === 'challenge-create' ? 70 : 0) : 0;
         const buttonsTop = btnY0 + 46 + shareH;
         const hasSeries = !!rec.series;
-        const extraH = (compare ? 186 : daily ? 166 : 0) + (hasSeries ? 110 : 0);
+        const extraH = (compare ? 186 : daily ? 166 : 0) + (hasSeries ? 110 : 0) + 210;
         const avail = L.contentTop - 20 - buttonsTop;
         const artSize = Math.max(120, Math.min(340, avail - (150 + 254 + extraH + 70)));
         // 高屏：内容整体下移，使其在标题与按钮之间居中
@@ -140,11 +157,19 @@ export class ResultPage extends BasePage {
 
         // 模式附加区：好友对比 / 每日结果卡片 / 提示
         let extraBottom = statsY - statsH / 2 - 24;
+        extraBottom = this.buildGrowthPanel(growth, rec.newlyCollected, extraBottom, W) - 16;
         if (rec.series) extraBottom = this.buildSeriesPanel(rec.series, rec.newlyCollected, extraBottom, W) - 16;
         if (compare) extraBottom = this.buildCompare(compare, extraBottom, W) - 16;
         else if (daily) extraBottom = this.buildDailyCard(daily, result.imageId, extraBottom, W) - 16;
         // 首次解锁：稍等星星动画结束后，弹出收藏卡片庆祝（重复完成不弹）
-        if (ser && rec.newlyCollected) tween(this.content).delay(1.5).call(() => this.showUnlock(ser, art.name, art.story, result.imageId)).start();
+        // 弹窗优先级（一次只弹一个，其余在“成长”面板里文字提示）：收藏解锁 > 周挑战完成 > 升级 > 成就
+        tween(this.content).delay(1.5).call(() => {
+            if (this.sm.currentName !== 'result' || this.sm.hasModal) return;
+            if (ser && rec.newlyCollected) this.showUnlock(ser, art.name, art.story, result.imageId);
+            else if (growth.weeklyCompleted) showWeeklyComplete();
+            else if (growth.levelAfter > growth.levelBefore) showLevelUp(growth.levelAfter, growth.newTitle);
+            else if (growth.achievements.length) showAchievementUnlocked(growth.achievements);
+        }).start();
         if (rec.newlyUnlocked.length) {
             this.sm.toast(`解锁新图：${rec.newlyUnlocked.map((a) => a.name).join('、')}`, 2.4);
         }
@@ -175,7 +200,7 @@ export class ResultPage extends BasePage {
             }, 0, btnY + 120);
         }
 
-        const againText = mode === 'classic' ? '再来一局' : mode === 'daily' ? '再挑战一次' : '再拼一次';
+        const againText = mode === 'classic' ? '再来一局' : mode === 'daily' ? '再挑战一次' : mode === 'challenge-accept' ? '再战一局' : '再拼一次';
         button(c, {
             w: bw, h: 92, text: againText, style: 'secondary', icon: gm.textures.icon('refresh', P.ink),
             onClick: () => {
@@ -184,20 +209,74 @@ export class ResultPage extends BasePage {
                 else if (session.challenge) this.sm.go('game', session, { replace: true });
             },
         }, -bw / 2 - 10, btnY);
-        const nextArt = this.nextPlayable(art.id);
-        if (mode === 'classic' && nextArt) {
+        // 下一张拼图：始终是最醒目的主按钮（经典模式按顺序；其它模式推荐一张）
+        const nextArt = mode === 'classic' ? this.nextPlayable(art.id) : gm.collection.suggestNext();
+        if (nextArt) {
             button(c, {
-                w: bw, h: 92, text: '下一张', style: 'mint', icon: gm.textures.icon('play', P.ink),
-                onClick: () => openDifficultySheet(nextArt, (g) => Flow.classic(nextArt.id, g)),
+                w: bw, h: 92, text: '下一张拼图', style: 'primary', icon: gm.textures.icon('play', P.white),
+                onClick: () => openDifficultySheet(nextArt, (g) => Flow.classic(nextArt.id, g), '下一张拼图'),
             }, bw / 2 + 10, btnY);
         } else {
             button(c, { w: bw, h: 92, text: '返回首页', style: 'mint', onClick: () => this.backHome() }, bw / 2 + 10, btnY);
         }
-        if (mode === 'classic' && nextArt) {
-            const home = label(c, '返回首页', Theme.font.small, { color: P.ink2, bold: true });
-            home.node.setPosition(0, btnY + (extraBottom > btnY + 160 ? 80 : 70));
-            home.node.on(Node.EventType.TOUCH_END, () => this.backHome());
-        }
+        // 左上角“回首页”小按钮（不抢主按钮的位置）
+        button(c, { w: 84, h: 72, style: 'white', icon: gm.textures.icon('back', P.ink), iconSize: 30, onClick: () => this.backHome() }, -L.w / 2 + Theme.gutter + 42, L.headerY);
+    }
+
+    private mergeGrowth(pu: ProgressUpdate, fu: ProgressUpdate | null): { xp: number; levelBefore: number; levelAfter: number; newTitle: string | null; achievements: AchievementDef[]; missions: ProgressUpdate['missions']; weekly: ProgressUpdate['weekly']; missionsAllDone: boolean; weeklyCompleted: boolean } {
+        const gm = this.gm;
+        const achievements = [...pu.achievements, ...(fu ? fu.achievements : [])];
+        for (const m of pu.missions) if (m.justCompleted) gm.analytics.track('daily_mission_completed', { id: m.id });
+        if (pu.weeklyCompleted) gm.analytics.track('weekly_challenge_completed', { week: gm.progress.weeklyView().challenge.weekKey });
+        for (const a of achievements) gm.analytics.track('achievement_unlocked', { id: a.id });
+        const levelAfter = fu ? fu.levelAfter : pu.levelAfter;
+        if (levelAfter > pu.levelBefore) gm.analytics.track('player_level_up', { level: levelAfter });
+        return {
+            xp: pu.xpGained + (fu ? fu.xpGained : 0),
+            levelBefore: pu.levelBefore,
+            levelAfter,
+            newTitle: (fu && fu.newTitle) || pu.newTitle,
+            achievements,
+            missions: pu.missions,
+            weekly: pu.weekly,
+            missionsAllDone: pu.missionsAllDone,
+            weeklyCompleted: pu.weeklyCompleted,
+        };
+    }
+
+    /** 成长面板：本局经验、等级进度、任务/周挑战进度、新成就、推荐下一步（一个面板，避免弹窗泛滥） */
+    private buildGrowthPanel(g: ReturnType<ResultPage['mergeGrowth']>, firstCollect: boolean, top: number, W: number): number {
+        const gm = this.gm;
+        const h = 190;
+        const p = panel(this.content, W, h, { fill: P.white, border: P.ink, shadow: P.lilac2, step: Theme.px, shadowDepth: 1.5 }, 0, top - h / 2);
+        const info = gm.progress.level();
+        const xpPill = panel(p, 150, 48, { fill: g.xp > 0 ? P.rose : P.cream2, border: P.ink, shadow: undefined, step: 3 }, -W / 2 + 100, h / 2 - 40);
+        label(xpPill, g.xp > 0 ? `+${g.xp} 经验` : '无新经验', Theme.font.small, { bold: true, color: g.xp > 0 ? P.white : P.ink2 });
+        const lvText = g.levelAfter > g.levelBefore ? `升级！Lv.${g.levelBefore} → Lv.${g.levelAfter}` : `Lv.${info.level} ${gm.progress.title()}`;
+        label(p, lvText, Theme.font.small, { bold: true, color: g.levelAfter > g.levelBefore ? P.rose2 : P.ink, align: 'left', width: W - 330 }).node.setPosition(-W / 2 + 190, h / 2 - 30);
+        xpBar(p, info, W - 330, -W / 2 + 190 + (W - 330) / 2, h / 2 - 68, P.rose);
+        label(p, `${info.into}/${info.need}`, Theme.font.tiny, { color: P.ink2, bold: true, align: 'right', width: 110 }).node.setPosition(W / 2 - 24, h / 2 - 30);
+        // 任务/周挑战/成就一行摘要（只展示本局有变化的）
+        const parts: string[] = [];
+        const mv = gm.progress.missionsView();
+        parts.push(`今日任务 ${mv.doneCount}/${mv.items.length}${g.missionsAllDone ? '（全部完成！）' : ''}`);
+        if (g.weekly.length) parts.push(`周挑战 +${g.weekly.length}`);
+        if (g.achievements.length) parts.push(`新成就：${g.achievements.map((a) => a.title).join('、')}`);
+        label(p, parts.join(' · '), Theme.font.tiny, { color: P.ink2, bold: true, align: 'left', width: W - 50 }).node.setPosition(-W / 2 + 25, -14);
+        const next = gm.progress.recommendNext(!!gm.daily.getRecord(gm.daily.todayKey())?.completed);
+        label(p, `下一步：${next.text}`, Theme.font.tiny, { color: P.rose2, bold: true, align: 'left', width: W - 50 }).node.setPosition(-W / 2 + 25, -h / 2 + 32);
+        onTap(p, () => this.goNext(next));
+        void firstCollect;
+        popIn(p, 0.5);
+        return top - h;
+    }
+
+    private goNext(n: NextStep): void {
+        this.gm.audio.play('click');
+        if (n.kind === 'daily') Flow.daily();
+        else if (n.kind === 'series' && n.seriesId) this.sm.go('series', { id: n.seriesId });
+        else if (n.kind === 'mission') this.sm.go('goals', { tab: 'missions' });
+        else if (n.kind === 'weekly') this.sm.go('goals', { tab: 'weekly' });
     }
 
     /** 作品所属系列的进度条；重复完成时说明离系列奖励还差几件 */
@@ -260,7 +339,7 @@ export class ResultPage extends BasePage {
     private backHome(): void {
         this.sm.home();
         // 插屏广告只允许在这种自然的页面切换点调用（默认禁用）
-        this.gm.ads.showInterstitialAtBreak();
+        this.gm.ads.showInterstitialAtBreak({ from: 'result_to_home' });
     }
 
     private nextPlayable(currentId: string) {

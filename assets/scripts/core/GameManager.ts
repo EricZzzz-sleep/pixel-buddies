@@ -1,5 +1,9 @@
 import { AdManager } from '../ads/AdManager';
 import { Analytics } from '../analytics/Analytics';
+import { PlatformAnalyticsSink } from '../analytics/PlatformSink';
+import { createLeaderboard, LeaderboardService, LocalLeaderboard } from '../social/LeaderboardService';
+import { RELEASE } from '../config/PlatformConfig';
+import { ProgressManager } from '../progress/ProgressManager';
 import { TextureFactory } from '../art/TextureFactory';
 import { CustomArtStore } from '../art/CustomArtStore';
 import type { ArtInfo } from '../art/ArtCatalog';
@@ -75,6 +79,8 @@ export class GameManager {
     readonly share: ShareManager;
     readonly ads: AdManager;
     readonly analytics = new Analytics();
+    readonly progress: ProgressManager;
+    readonly leaderboard: LeaderboardService;
     readonly textures = new TextureFactory();
     readonly customArt: CustomArtStore;
     audio!: AudioManager;
@@ -87,7 +93,15 @@ export class GameManager {
         this.daily = new DailyChallengeManager(this.save);
         this.challenges = new ChallengeManager(this.save);
         this.share = new ShareManager(platform, this.challenges);
-        this.ads = new AdManager(platform);
+        this.progress = new ProgressManager(this.save, this.collection);
+        const local = new LocalLeaderboard((board, key) => {
+            const r = board === 'daily' ? this.save.data.daily[key] : undefined;
+            return r && r.completed ? { timeMs: r.bestTimeMs, moves: r.bestMoves } : null;
+        });
+        this.leaderboard = createLeaderboard(RELEASE.leaderboardEndpoint, platform.capabilities.request ? (r) => platform.request(r) : null, local, RELEASE.version);
+        this.analytics.addSink(new PlatformAnalyticsSink(platform));
+        this.share.onShare = (kind) => this.analytics.track('share_clicked', { kind });
+        this.ads = new AdManager(platform, this.save, this.analytics);
         this.customArt = new CustomArtStore(this.save);
         this.textures.customProvider = (id) => this.customArt.canvasOf(id);
         this.save.subscribe(() => this.events.emit('save:changed'));

@@ -83,6 +83,9 @@ export class ChallengePage extends BasePage {
         const recent = panel(this.root, W, recentH, { fill: P.cream2, border: P.cream3, step: Theme.px, shadow: undefined }, 0, y - recentH / 2);
         label(recent, '最近挑战（本地记录）', Theme.font.small, { bold: true, align: 'left', color: P.ink2 }).node.setPosition(-W / 2 + 24, recentH / 2 - 34);
         this.recentHolder = makeNode('Recent', recent, W, recentH - 70, 0, -30);
+        const more = label(recent, '全部记录 ›', Theme.font.tiny, { bold: true, color: P.rose2, align: 'right', width: 200 });
+        more.node.setPosition(W / 2 - 120, recentH / 2 - 34);
+        onTap(more.node, () => this.sm.go('history'));
     }
 
     onEnter(): void {

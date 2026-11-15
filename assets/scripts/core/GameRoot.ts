@@ -3,6 +3,7 @@ import { DEBUG, EDITOR } from 'cc/env';
 import { P } from '../art/Palette';
 import { AudioManager } from '../audio/AudioManager';
 import { CHALLENGE } from '../config/GameConfig';
+import { RELEASE } from '../config/PlatformConfig';
 import { ChallengePage } from '../pages/ChallengePage';
 import { ClassicPage } from '../pages/ClassicPage';
 import { CollectionPage } from '../pages/CollectionPage';
@@ -16,6 +17,9 @@ import { WorkshopPage } from '../pages/WorkshopPage';
 import { PolicyPage } from '../pages/PolicyPage';
 import { SeriesPage } from '../pages/SeriesPage';
 import { RewardPage } from '../pages/RewardPage';
+import { GoalsPage } from '../pages/GoalsPage';
+import { ProfilePage } from '../pages/ProfilePage';
+import { HistoryPage } from '../pages/HistoryPage';
 import { createPlatformAdapter } from '../platform/PlatformFactory';
 import { PlatformAdapter } from '../platform/PlatformAdapter';
 import { hex, Theme } from '../ui/Theme';
@@ -79,6 +83,9 @@ export class GameRoot extends Component {
         this.sm.register(new PolicyPage(this.sm, 'policy'));
         this.sm.register(new SeriesPage(this.sm, 'series'));
         this.sm.register(new RewardPage(this.sm, 'reward'));
+        this.sm.register(new GoalsPage(this.sm, 'goals'));
+        this.sm.register(new ProfilePage(this.sm, 'profile'));
+        this.sm.register(new HistoryPage(this.sm, 'history'));
 
         this.bindLifecycle(platform);
         this.gm.share.registerPassiveShare();
@@ -86,6 +93,7 @@ export class GameRoot extends Component {
 
     start(): void {
         this.sm.go('home');
+        this.gm.analytics.trackOnce('app_opened', 'app_opened', { platform: this.gm.platform.kind, version: RELEASE.version, launch: this.gm.save.data.launchCount });
         // 冷启动：从分享卡片进入时 query 中带有挑战数据
         const launch = this.gm.platform.getLaunchInfo();
         this.handleQuery(launch.query);

@@ -5,6 +5,8 @@ import {
     ChosenImage,
     DecodedImage,
     Insets,
+    HttpRequest,
+    HttpResponse,
     InterstitialAdHandle,
     LaunchInfo,
     MenuButtonRect,
@@ -117,6 +119,8 @@ export abstract class MiniGameAdapterBase implements PlatformAdapter {
             interstitialAd: isFn(api.createInterstitialAd),
             chooseImage: false,
             shareImage: false,
+            analyticsReport: isFn(api.reportEvent) || isFn(api.reportAnalytics),
+            request: isFn(api.request),
         };
     }
 
@@ -200,6 +204,41 @@ export abstract class MiniGameAdapterBase implements PlatformAdapter {
                 undefined,
                 'getClipboardData',
             );
+        });
+    }
+
+    reportEvent(name: string, data: Record<string, string | number | boolean>): void {
+        // 微信 wx.reportEvent(eventId, data)；抖音 tt.reportAnalytics(name, data)
+        if (isFn(this.api.reportEvent)) safeCall(() => this.api.reportEvent(name, data), undefined, 'reportEvent');
+        else if (isFn(this.api.reportAnalytics)) safeCall(() => this.api.reportAnalytics(name, data), undefined, 'reportAnalytics');
+    }
+
+    request(opts: HttpRequest): Promise<HttpResponse | null> {
+        if (!isFn(this.api.request)) return Promise.resolve(null);
+        return new Promise((resolve) => {
+            let done = false;
+            const fin = (r: HttpResponse | null) => {
+                if (done) return;
+                done = true;
+                resolve(r);
+            };
+            const ok = safeCall(
+                () => {
+                    this.api.request({
+                        url: opts.url,
+                        method: opts.method || 'GET',
+                        data: opts.body,
+                        timeout: opts.timeoutMs || 8000,
+                        header: { 'content-type': 'application/json' },
+                        success: (r: { statusCode: number; data: any }) => fin({ status: r.statusCode, data: r.data }),
+                        fail: () => fin(null),
+                    });
+                    return true;
+                },
+                false,
+                'request',
+            );
+            if (!ok) fin(null);
         });
     }
 

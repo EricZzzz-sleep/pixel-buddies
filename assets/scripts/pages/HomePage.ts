@@ -6,6 +6,7 @@ import { formatDuration } from '../core/GameTimer';
 import { Theme } from '../ui/Theme';
 import { button, ButtonHandle, drawPanel, label, makeNode, onTap, panel, popIn, sprite, starRow } from '../ui/UIKit';
 import { BasePage } from './BasePage';
+import { redDot } from './GrowthKit';
 import { artFrame, fmtDate, Flow, openDifficultySheet, segmentBar, setLabel, starFrames } from './PageKit';
 
 /**
@@ -14,6 +15,8 @@ import { artFrame, fmtDate, Flow, openDifficultySheet, segmentBar, setLabel, sta
  */
 export class HomePage extends BasePage {
     private starLabel!: Label;
+    private subLabel!: Label;
+    private goalsDot: Node | null = null;
     private dailyThumb!: Sprite;
     private dailyName!: Label;
     private dailyStatus!: Label;
@@ -47,6 +50,16 @@ export class HomePage extends BasePage {
         nick.node.setPosition(-L.w / 2 + Theme.gutter + 92, L.headerY + 14);
         const sub = label(this.root, '今天也来拼一张吧', Theme.font.tiny, { color: Theme.textMuted, align: 'left' });
         sub.node.setPosition(-L.w / 2 + Theme.gutter + 92, L.headerY - 18);
+        this.subLabel = sub;
+        // 点击头像/昵称进入个人资料（等级、统计、设置入口）
+        onTap(avatar, () => {
+            gm.audio.play('click');
+            this.sm.go('profile');
+        });
+        onTap(nick.node, () => {
+            gm.audio.play('click');
+            this.sm.go('profile');
+        });
         const starPill = panel(this.root, 150, 60, { fill: P.butter, border: P.ink, shadow: P.gold2, step: Theme.px }, L.headerRight - 75, L.headerY);
         sprite(starPill, gm.textures.icon('star', P.gold, P.white), 30, 28, -42, 0);
         this.starLabel = label(starPill, '0', Theme.font.body, { bold: true });
@@ -112,14 +125,18 @@ export class HomePage extends BasePage {
         const gridY = bottom + tileH / 2 + 6;
         const entries: Array<{ text: string; icon: string; style: 'mint' | 'sky' | 'lilac' | 'white'; color: number; go: () => void }> = [
             { text: '经典拼图', icon: 'puzzle', style: 'mint', color: P.leaf3, go: () => this.sm.go('classic') },
+            { text: '任务成就', icon: 'trophy', style: 'white', color: P.gold2, go: () => this.sm.go('goals') },
             { text: '好友挑战', icon: 'users', style: 'sky', color: P.blue3, go: () => this.sm.go('challenge') },
             { text: '我的收藏', icon: 'book', style: 'lilac', color: P.purple2, go: () => this.sm.go('collection') },
-            { text: '设置', icon: 'gear', style: 'white', color: P.ink2, go: () => this.sm.go('settings') },
         ];
         const gap = 16;
         const tw = (W - gap * 3) / 4;
         entries.forEach((e, i) => {
-            button(this.root, { w: tw, h: tileH, text: e.text, fontSize: Theme.font.small, style: e.style, icon: gm.textures.icon(e.icon, e.color, P.white), iconSize: 52, iconTop: true, onClick: e.go }, -W / 2 + tw / 2 + i * (tw + gap), gridY);
+            const tile = button(this.root, { w: tw, h: tileH, text: e.text, fontSize: Theme.font.small, style: e.style, icon: gm.textures.icon(e.icon, e.color, P.white), iconSize: 52, iconTop: true, onClick: e.go }, -W / 2 + tw / 2 + i * (tw + gap), gridY);
+            if (e.icon === 'trophy') {
+                this.goalsDot = redDot(tile.node, tw / 2 - 14, tileH / 2 - 14, 28);
+                this.goalsDot.active = false;
+            }
         });
 
         // ---------- 我的收藏入口（开始按钮与底部入口之间）：总进度、最近解锁、下一个系列奖励
@@ -148,6 +165,13 @@ export class HomePage extends BasePage {
         const gm = this.gm;
         const total = gm.collection.totalStars();
         setLabel(this.starLabel, String(total));
+
+        // 等级/任务摘要 + 可领取奖励红点（无惩罚：只展示今天的进度）
+        const pg = gm.progress;
+        pg.refresh();
+        const mv = pg.missionsView();
+        setLabel(this.subLabel, `Lv.${pg.level().level} ${pg.title()} · 今日任务 ${mv.doneCount}/${mv.items.length}`);
+        if (this.goalsDot) this.goalsDot.active = pg.claimableCount() > 0;
 
         // 每日挑战
         const daily = gm.daily.getToday();
