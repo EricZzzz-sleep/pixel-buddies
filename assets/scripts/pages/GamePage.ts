@@ -465,6 +465,7 @@ export class GamePage extends BasePage {
     /**
      * 教程卡片：标题 / 正文（顶部对齐）/ 主按钮（底部）/ 右上角“跳过教程”。
      * 卡片高度必须容得下正文：h ≥ 84（标题区）+ 正文高度 + 104（按钮区）。
+     * “跳过教程”放在左上角：微信/抖音的胶囊按钮在右上角，会盖住放在右上角的按钮（微信开发者工具中实测发现）。
      */
     private coachCard(cy: number, h: number, title: string, body: string, primary: { text: string; onClick: () => void } | null, skip: boolean): void {
         const gm = this.gm;
@@ -476,7 +477,7 @@ export class GamePage extends BasePage {
         b.node.getComponent(UITransform)!.setAnchorPoint(0.5, 1);
         b.node.setPosition(0, h / 2 - 84);
         this.tutBody = b;
-        if (skip) button(card, { w: 150, h: 44, text: '跳过教程', fontSize: Theme.font.small - 4, style: 'ghost', onClick: () => this.skipTutorial() }, w / 2 - 98, h / 2 - 36);
+        if (skip) button(card, { w: 150, h: 44, text: '跳过教程', fontSize: Theme.font.small - 4, style: 'ghost', onClick: () => this.skipTutorial() }, -w / 2 + 98, h / 2 - 36);
         if (primary) button(card, { w: w - 120, h: 72, text: primary.text, style: 'primary', onClick: primary.onClick }, 0, -h / 2 + 16 + 36);
         this.tutCard = card;
         const op = opacityOf(card);
