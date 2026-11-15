@@ -3,10 +3,10 @@ import { getArt } from '../art/ArtCatalog';
 import { P } from '../art/Palette';
 import { DIFFICULTIES } from '../config/GameConfig';
 import { formatDuration } from '../core/GameTimer';
-import { hex, Theme } from '../ui/Theme';
-import { button, ButtonHandle, label, makeNode, panel, popIn, sprite, starRow } from '../ui/UIKit';
+import { Theme } from '../ui/Theme';
+import { button, ButtonHandle, drawPanel, label, makeNode, onTap, panel, popIn, sprite, starRow } from '../ui/UIKit';
 import { BasePage } from './BasePage';
-import { artFrame, fmtDate, Flow, openDifficultySheet, setLabel, starFrames } from './PageKit';
+import { artFrame, fmtDate, Flow, openDifficultySheet, segmentBar, setLabel, starFrames } from './PageKit';
 
 /**
  * 首页：Logo、玩家信息与星星、每日挑战卡片、大号“开始拼图”、四个功能入口。
@@ -21,9 +21,12 @@ export class HomePage extends BasePage {
     private dailyDate!: Label;
     private dailyBtn!: ButtonHandle;
     private startBtn!: ButtonHandle;
-    private progressLabel!: Label;
-    private progressBar!: Graphics;
-    private progressW = 0;
+    private collTitle!: Label;
+    private collSub!: Label;
+    private collThumb!: Sprite;
+    private collBarHolder!: Node;
+    private avatarG!: Graphics;
+    private avatarBadge!: Node;
     private dailyStarsHolder!: Node;
     private animNodes: Node[] = [];
     private animBases: Vec3[] = [];
@@ -36,6 +39,10 @@ export class HomePage extends BasePage {
         // ---------- 顶部：头像 + 昵称 + 星星
         const avatar = panel(this.root, 76, 76, { fill: P.peach, border: P.ink, shadow: P.orange2, step: Theme.px }, -L.w / 2 + Theme.gutter + 38, L.headerY);
         sprite(avatar, gm.textures.art('cat_orange'), 56, 56).node.setPosition(0, 0);
+        this.avatarG = avatar.getComponent(Graphics)!;
+        // 系列奖励“头像框”：集齐系列后头像框换成该系列主色，右下角出现徽章
+        this.avatarBadge = sprite(avatar, gm.textures.icon('badge', P.gold, P.white), 30, 30, 30, -30).node;
+        this.avatarBadge.active = false;
         const nick = label(this.root, gm.save.data.player.nickname, Theme.font.body, { bold: true, align: 'left' });
         nick.node.setPosition(-L.w / 2 + Theme.gutter + 92, L.headerY + 14);
         const sub = label(this.root, '今天也来拼一张吧', Theme.font.tiny, { color: Theme.textMuted, align: 'left' });
@@ -115,15 +122,22 @@ export class HomePage extends BasePage {
             button(this.root, { w: tw, h: tileH, text: e.text, fontSize: Theme.font.small, style: e.style, icon: gm.textures.icon(e.icon, e.color, P.white), iconSize: 52, iconTop: true, onClick: e.go }, -W / 2 + tw / 2 + i * (tw + gap), gridY);
         });
 
-        // ---------- 收藏进度条（开始按钮与入口之间）
-        const midY = startY - 64 - 40 - 46 - extra * 0.16;
-        const prog = panel(this.root, W, 92, { fill: P.cream2, border: P.cream3, step: Theme.px, shadow: undefined }, 0, midY);
-        sprite(prog, gm.textures.icon('book', P.purple, P.white), 34, 26, -W / 2 + 40, 12);
-        this.progressLabel = label(prog, '', Theme.font.small, { bold: true, align: 'left', color: P.ink2 });
-        this.progressLabel.node.setPosition(-W / 2 + 70, 12);
-        this.progressW = W - 60;
-        const bar = makeNode('Bar', prog, this.progressW, 14, 0, -20);
-        this.progressBar = bar.addComponent(Graphics);
+        // ---------- 我的收藏入口（开始按钮与底部入口之间）：总进度、最近解锁、下一个系列奖励
+        const midY = startY - 64 - 30 - 68 - extra * 0.12;
+        const ch = 136;
+        const coll = panel(this.root, W, ch, { fill: P.white, border: P.ink, shadow: P.lilac2, step: Theme.px, shadowDepth: 1.5 }, 0, midY);
+        const thumbBg = panel(coll, 100, 100, { fill: P.lilac, border: P.ink, shadow: undefined, step: 3 }, -W / 2 + 74, 0);
+        this.collThumb = sprite(thumbBg, gm.textures.mosaic('cat_orange'), 80, 80);
+        this.collTitle = label(coll, '', Theme.font.body, { bold: true, align: 'left', width: W - 190 });
+        this.collTitle.node.setPosition(-W / 2 + 146, ch / 2 - 32);
+        this.collSub = label(coll, '', Theme.font.tiny, { color: P.ink2, bold: true, align: 'left', width: W - 190 });
+        this.collSub.node.setPosition(-W / 2 + 146, ch / 2 - 66);
+        this.collBarHolder = makeNode('Bar', coll, W - 190, 20, 56, -ch / 2 + 30);
+        sprite(coll, gm.textures.icon('book', P.purple, P.white), 30, 24, W / 2 - 34, ch / 2 - 30);
+        onTap(coll, () => {
+            gm.audio.play('click');
+            this.sm.go('collection');
+        });
 
         popIn(logo, 0.05);
         popIn(card, 0.1);
@@ -159,18 +173,26 @@ export class HomePage extends BasePage {
         const next = gm.collection.suggestNext();
         if (this.startBtn.sub) setLabel(this.startBtn.sub, `推荐：${next.name}`);
 
-        // 收藏进度
-        const got = gm.collection.collectedCount();
-        const all = gm.collection.getEntries().length;
-        setLabel(this.progressLabel, `作品收藏 ${got}/${all}    星星 ${total}/${gm.collection.maxStars()}`);
-        const g = this.progressBar;
-        g.clear();
-        g.fillColor = hex(P.white);
-        g.rect(-this.progressW / 2, -7, this.progressW, 14);
-        g.fill();
-        g.fillColor = hex(P.mint3);
-        g.rect(-this.progressW / 2, -7, (this.progressW * got) / Math.max(1, all), 14);
-        g.fill();
+        // 我的收藏卡片 + 头像框
+        const ov = gm.collection.overall();
+        const latest = gm.collection.latestUnlocked();
+        this.collThumb.spriteFrame = latest ? gm.textures.art(latest.id) : gm.textures.mosaic('cat_orange');
+        setLabel(this.collTitle, `我的收藏  ${ov.collected}/${ov.total}`);
+        const nextS = gm.collection.nextRewardSeries();
+        setLabel(
+            this.collSub,
+            !nextS
+                ? '全部主题已集齐，太厉害了！'
+                : latest
+                  ? `最近解锁：${latest.name} · ${nextS.info.name} ${nextS.collected}/${nextS.total}，再收集 ${nextS.remaining} 件得奖励`
+                  : '完成拼图，解锁你的第一件收藏',
+        );
+        this.collBarHolder.destroyAllChildren();
+        segmentBar(this.collBarHolder, ov.total, ov.collected, this.collBarHolder.getComponent('cc.UITransform') ? (this.L.w - Theme.gutter * 2) - 190 : 400, 16, nextS ? nextS.info.reward.color : P.mint3, 0, 0);
+        const frame = gm.collection.earnedRewards()[0];
+        drawPanel(this.avatarG, 76, 76, { fill: P.peach, border: frame ? frame.reward.color : P.ink, shadow: frame ? frame.reward.color : P.orange2, step: Theme.px, borderWidth: frame ? Theme.px * 2 : Theme.px });
+        this.avatarBadge.active = !!frame;
+        if (frame) (this.avatarBadge.getComponent(Sprite) as Sprite).spriteFrame = gm.textures.icon('badge', frame.reward.color, P.white);
 
         this.startIdle();
     }

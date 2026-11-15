@@ -1,103 +1,106 @@
-import { Label } from 'cc';
-import { ArtCategory, CATEGORY_LABEL } from '../art/ArtCatalog';
+import { Graphics, Node, tween } from 'cc';
 import { P } from '../art/Palette';
-import { DIFFICULTIES, SUPPORTED_GRIDS } from '../config/GameConfig';
-import { CollectionEntry } from '../collection/CollectionManager';
-import { formatDuration } from '../core/GameTimer';
-import { Theme } from '../ui/Theme';
+import { SERIES_STATE_TEXT, SeriesState } from '../collection/SeriesCatalog';
+import { hex, Theme } from '../ui/Theme';
 import { ScrollList } from '../ui/ScrollList';
-import { button, label, panel, starRow } from '../ui/UIKit';
+import { label, makeNode, onTap, panel, sprite } from '../ui/UIKit';
 import { BasePage } from './BasePage';
-import { artCard, artCardHeight, artFrame, categoryTabs, Flow, openDifficultySheet, setLabel, starFrames } from './PageKit';
+import { artFrame, rewardRow, segmentBar } from './PageKit';
+
+const STATE_COLOR: Record<SeriesState, number> = { 'not-started': P.grey, collecting: P.butter, almost: P.pink2, done: P.mint2 };
+
+/** 页面背景色晕：系列奖励“专属收藏背景”的实现（只是一层淡色，几乎没有开销） */
+export function washBackground(page: BasePage, holder: { node: Node | null }, color: number | null, w: number, h: number): void {
+    if (holder.node) {
+        holder.node.destroy();
+        holder.node = null;
+    }
+    if (color === null) return;
+    const n = makeNode('Wash', page.root, w, h);
+    n.setSiblingIndex(0);
+    const g = n.addComponent(Graphics);
+    g.fillColor = hex(color, 38);
+    g.rect(-w / 2, -h / 2, w, h);
+    g.fill();
+    holder.node = n;
+}
 
 /**
- * 作品收藏册：按主题分类展示；未收集的作品显示马赛克预览。
- * 点击已收集作品查看大图、小故事与各难度最佳成绩。
+ * 我的收藏：总览（已收藏 x/12、整体进度、已完成主题）+ 主题系列卡片。
+ * 点击主题进入该系列的作品网格；有尚未展示的系列奖励时，先进入庆祝页。
  */
 export class CollectionPage extends BasePage {
     private list!: ScrollList;
-    private category: ArtCategory | null = null;
-    private summary!: Label;
+    private wash: { node: Node | null } = { node: null };
 
     protected build(): void {
         const L = this.L;
         this.header('我的收藏');
-        const W = L.w - Theme.gutter * 2;
-        const sumY = L.contentTop - 34;
-        const sp = panel(this.root, W, 64, { fill: P.lilac, border: P.ink, step: Theme.px, shadow: P.purple }, 0, sumY);
-        this.summary = label(sp, '', Theme.font.small, { bold: true });
-        const tabsY = sumY - 84;
-        categoryTabs(this.root, tabsY, W, (c) => {
-            this.category = c;
-            this.refresh(true);
-        });
-        const listTop = tabsY - 46;
-        const listBottom = -L.h / 2 + L.safeBottom + 10;
-        const h = listTop - listBottom;
-        this.list = ScrollList.create(this.root, L.w, h, 0, listBottom + h / 2);
+        const top = L.contentTop - 6;
+        const bottom = -L.h / 2 + L.safeBottom + 10;
+        this.list = ScrollList.create(this.root, L.w, top - bottom, 0, (top + bottom) / 2);
     }
 
     onEnter(): void {
-        const c = this.gm.collection;
-        setLabel(this.summary, `已收集 ${c.collectedCount()}/${c.getEntries().length} 幅作品 · 星星 ${c.totalStars()}/${c.maxStars()}`);
-        this.refresh(false);
+        const gm = this.gm;
+        gm.analytics.track('collection_page_opened', { page: 'collection' });
+        const unseen = gm.collection.unseenRewards();
+        this.refresh();
+        // 旧存档补发的奖励、或结算页没来得及展示的奖励：进入收藏册时展示一次庆祝页
+        if (unseen.length) this.scheduleOnce(() => gm.scene.currentName === 'collection' && gm.scene.go('reward', { id: unseen[0] }), 0.35);
     }
 
-    private refresh(toTop: boolean): void {
+    private scheduleOnce(fn: () => void, delay: number): void {
+        // 注意：SceneManager 转场会停掉页面 root 上的 tween，所以挂在滚动容器上
+        tween(this.list.node).delay(delay).call(fn).start();
+    }
+
+    private refresh(): void {
+        const gm = this.gm;
         const L = this.L;
         const content = this.list.content;
         content.destroyAllChildren();
         const W = L.w - Theme.gutter * 2;
-        const cols = 3;
-        const gap = 20;
-        const cw = (W - gap * (cols - 1)) / cols;
-        const ch = artCardHeight(cw);
-        const entries = this.gm.collection.getEntries(this.category || undefined);
-        entries.forEach((e, i) => {
-            const col = i % cols;
-            const row = Math.floor(i / cols);
-            artCard(content, {
-                art: e.art,
-                w: cw,
-                reveal: e.collected,
-                caption: e.collected ? (e.bestTimeMs ? `最快 ${formatDuration(e.bestTimeMs)} · ${'★'.repeat(e.bestStars)}` : '已收集') : `未收集 · ${CATEGORY_LABEL[e.art.category]}`,
-                onClick: () => (e.collected ? this.openDetail(e) : this.sm.toast('完成这幅拼图即可收入收藏册')),
-            }, -W / 2 + cw / 2 + col * (cw + gap), -20 - ch / 2 - row * (ch + gap));
-        });
-        this.list.setContentHeight(Math.ceil(entries.length / cols) * (ch + gap) + 40);
-        if (toTop) this.list.scrollToTop();
-    }
+        const ov = gm.collection.overall();
+        const latest = gm.collection.earnedRewards()[0];
+        washBackground(this, this.wash, latest ? latest.reward.color : null, L.fullW, L.fullH);
 
-    private openDetail(e: CollectionEntry): void {
-        const gm = this.gm;
-        const w = Math.min(this.L.w - 48, 640);
-        const h = 1030;
-        const card = this.sm.openModal(w, h);
-        artFrame(card, gm.textures.art(e.art.id), 320, 0, h / 2 - 210, e.art.tint);
-        label(card, e.art.name, Theme.font.title, { bold: true }).node.setPosition(0, h / 2 - 410);
-        const story = label(card, `“${e.art.story}”`, Theme.font.small, { color: P.ink2, width: w - 80, wrap: true });
-        story.node.setPosition(0, h / 2 - 462);
-        SUPPORTED_GRIDS.forEach((g, i) => {
-            const r = e.records[g];
-            const y = h / 2 - 540 - i * 74;
-            const row = panel(card, w - 60, 62, { fill: r ? P.white : P.cream2, border: P.cream3, step: Theme.px, shadow: undefined }, 0, y);
-            label(row, `${DIFFICULTIES[g].label} ${DIFFICULTIES[g].desc}`, Theme.font.small, { bold: true, align: 'left' }).node.setPosition(-(w - 60) / 2 + 20, 0);
-            if (r) {
-                label(row, `${formatDuration(r.bestTimeMs)} · ${r.bestMoves} 步 · ${r.completions} 次`, Theme.font.tiny, { color: P.ink2, align: 'right' }).node.setPosition((w - 60) / 2 - 120, 0);
-                starRow(row, starFrames(), r.bestStars, 3, 22, 4).setPosition((w - 60) / 2 - 56, 0);
-            } else {
-                label(row, '未完成', Theme.font.tiny, { color: Theme.textMuted, align: 'right' }).node.setPosition((w - 60) / 2 - 20, 0);
-            }
-        });
-        button(card, {
-            w: w - 100,
-            h: 96,
-            text: '再拼一次',
-            style: 'primary',
-            onClick: () => {
-                this.sm.closeModal();
-                openDifficultySheet(e.art, (g) => Flow.classic(e.art.id, g));
-            },
-        }, 0, -h / 2 + 80);
+        // ---- 总览卡片
+        const sh = 190;
+        const sum = panel(content, W, sh, { fill: P.white, border: latest ? latest.reward.color : P.ink, shadow: P.ink, step: Theme.px, shadowDepth: 2 }, 0, -14 - sh / 2);
+        label(sum, `已收藏 ${ov.collected}/${ov.total} 件作品`, Theme.font.h2, { bold: true, align: 'left', width: W - 60 }).node.setPosition(-W / 2 + 30, sh / 2 - 44);
+        segmentBar(sum, ov.total, ov.collected, W - 60, 22, P.rose, 0, 8);
+        label(sum, `整体进度 ${Math.round(ov.ratio * 100)}%`, Theme.font.small, { color: P.ink2, bold: true, align: 'left', width: 260 }).node.setPosition(-W / 2 + 30, -sh / 2 + 42);
+        label(sum, `已完成主题 ${ov.seriesDone}/${ov.seriesTotal}`, Theme.font.small, { color: P.rose2, bold: true, align: 'right', width: 300 }).node.setPosition(W / 2 - 30, -sh / 2 + 42);
+
+        // ---- 主题系列卡片
+        const ch = 286;
+        let y = -14 - sh - 24;
+        for (const s of gm.collection.allSeries()) {
+            const done = s.done;
+            const color = s.info.reward.color;
+            const card = panel(content, W, ch, { fill: P.white, border: done ? color : P.cream3, shadow: done ? color : Theme.shadow, step: Theme.px, shadowDepth: 1.5 }, 0, y - ch / 2);
+            const coverId = s.collected > 0 ? s.info.cover : s.info.cover;
+            const have = gm.collection.isCollected(coverId);
+            artFrame(card, have ? gm.textures.art(coverId) : gm.textures.mosaic(coverId), 140, -W / 2 + 108, 34, s.info.tint);
+            const x0 = -W / 2 + 214;
+            const rw = W - 240;
+            label(card, `系列 0${s.info.no}  ${s.info.name}`, Theme.font.body, { bold: true, align: 'left', width: rw }).node.setPosition(x0, ch / 2 - 42);
+            label(card, s.info.desc, Theme.font.tiny, { color: Theme.textMuted, align: 'left', width: rw }).node.setPosition(x0, ch / 2 - 78);
+            segmentBar(card, s.total, s.collected, rw - 90, 18, color, x0 + (rw - 90) / 2, ch / 2 - 116);
+            label(card, `${s.collected}/${s.total}`, Theme.font.body, { bold: true, align: 'right', width: 80 }).node.setPosition(x0 + rw, ch / 2 - 116);
+            const chip = panel(card, 150, 36, { fill: STATE_COLOR[s.state], border: P.ink, shadow: undefined, step: 3 }, x0 + 75, ch / 2 - 160);
+            label(chip, SERIES_STATE_TEXT[s.state], Theme.font.tiny, { bold: true });
+            if (s.state === 'almost') label(card, `再收集 1 件得奖励`, Theme.font.tiny, { color: P.rose2, bold: true, align: 'left', width: rw - 170 }).node.setPosition(x0 + 168, ch / 2 - 160);
+            rewardRow(card, s.info, done, W - 40, 0, -ch / 2 + 54);
+            if (done) sprite(card, gm.textures.icon('crown', color, P.white), 44, 28, W / 2 - 50, ch / 2 - 40);
+            onTap(card, () => {
+                gm.audio.play('click');
+                this.sm.go('series', { id: s.info.id });
+            });
+            y -= ch + 22;
+        }
+        this.list.setContentHeight(-y + 30);
+        this.list.scrollToTop();
     }
 }

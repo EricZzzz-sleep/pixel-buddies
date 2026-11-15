@@ -3,11 +3,12 @@
  *
  * 版本历史：
  * - v1：早期原型格式（扁平的 best 表 + unlocked 数组 + sound 开关）。保留迁移以演示/保障兼容。
- * - v2：当前格式。
+ * - v2：加入像素工坊作品与授权记录。
+ * - v3：加入主题系列奖励（rewards）。
  * 新增字段时：提升 SAVE_VERSION，在 migrate() 中补默认值，绝不直接丢弃旧数据。
  */
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export interface LevelRecord {
     bestTimeMs: number;
@@ -52,6 +53,12 @@ export interface CustomWork {
     pixels: string;
 }
 
+/** 主题系列奖励：集齐系列时自动发放一次，seen 表示庆祝页已展示/奖励已收下 */
+export interface SeriesRewardRecord {
+    at: number;
+    seen: boolean;
+}
+
 export interface Settings {
     music: boolean;
     sfx: boolean;
@@ -81,6 +88,8 @@ export interface SaveData {
     custom: CustomWork[];
     /** 玩家已确认的授权说明（例如使用相册前的隐私提示） */
     consent: { photo: boolean };
+    /** 系列奖励：seriesId → 记录。只增不减，保证不会重复发放 */
+    rewards: Record<string, SeriesRewardRecord>;
 }
 
 export function createDefaultSave(now: number): SaveData {
@@ -100,6 +109,7 @@ export function createDefaultSave(now: number): SaveData {
         player: { nickname: '像素搭子', avatarId: 0 },
         custom: [],
         consent: { photo: false },
+        rewards: {},
     };
 }
 
@@ -164,14 +174,9 @@ export function migrate(raw: unknown, now: number): SaveData | null {
     if (!isObj(raw)) return null;
     let data: any = raw;
     if (data.version === 1) data = migrateV1(data as SaveDataV1, now);
-    if (data.version !== SAVE_VERSION) {
-        // 来自更新版本的存档：尽量保留可识别字段，不降级覆盖
-        if (typeof data.version === 'number' && data.version > SAVE_VERSION) {
-            console.warn('[Save] 存档版本高于当前游戏版本，按兼容模式读取');
-        } else {
-            return null;
-        }
-    }
+    // 所有旧版本（v1 已迁移、v2…）都按字段逐项补默认值，不丢任何已有进度
+    if (typeof data.version !== 'number' || data.version < 1) return null;
+    if (data.version > SAVE_VERSION) console.warn('[Save] 存档版本高于当前游戏版本，按兼容模式读取');
     const d = createDefaultSave(num(data.firstLaunchAt, now));
     d.lastLaunchAt = num(data.lastLaunchAt, now);
     d.launchCount = num(data.launchCount, 0);
@@ -196,6 +201,12 @@ export function migrate(raw: unknown, now: number): SaveData | null {
         );
     }
     if (isObj(data.consent)) d.consent.photo = bool(data.consent.photo, false);
+    if (isObj(data.rewards)) {
+        for (const k of Object.keys(data.rewards)) {
+            const r = data.rewards[k];
+            if (isObj(r) && typeof r.at === 'number') d.rewards[k] = { at: r.at, seen: bool(r.seen, false) };
+        }
+    }
     if (isObj(data.player)) {
         if (typeof data.player.nickname === 'string' && data.player.nickname) d.player.nickname = data.player.nickname.slice(0, 12);
         d.player.avatarId = num(data.player.avatarId, 0);

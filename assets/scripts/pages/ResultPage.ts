@@ -1,6 +1,5 @@
 import { Node, tween, Vec3 } from 'cc';
 import { ART_LIST } from '../art/ArtCatalog';
-import { isCustomId } from '../art/CustomArtStore';
 import { P } from '../art/Palette';
 import { DIFFICULTIES } from '../config/GameConfig';
 import { formatDuration } from '../core/GameTimer';
@@ -10,9 +9,10 @@ import { ChallengeComparison } from '../social/ChallengeManager';
 import { ChallengeData } from '../social/ChallengeCodec';
 import { Effects } from '../ui/Effects';
 import { Theme } from '../ui/Theme';
-import { button, label, makeNode, panel, popIn, sprite } from '../ui/UIKit';
+import { button, label, makeNode, onTap, panel, popIn, sprite } from '../ui/UIKit';
 import { BasePage } from './BasePage';
-import { artFrame, fmtDate, Flow, openDifficultySheet, starFrames } from './PageKit';
+import { SeriesUpdate } from '../collection/CollectionManager';
+import { artFrame, fmtDate, Flow, openDifficultySheet, segmentBar, starFrames } from './PageKit';
 
 /**
  * 结算页：作品展示、星级动画、用时/步数/提示、最佳成绩与新纪录；
@@ -48,6 +48,14 @@ export class ResultPage extends BasePage {
         if (session.mode === 'challenge-create' && session.challenge) shareData = gm.challenges.withResult(session.challenge, result);
         gm.save.flush();
 
+        // 收藏事件：只有“首次解锁”才记录解锁/系列进度；重复完成不会重复触发
+        const ser = rec.series;
+        if (ser && rec.newlyCollected) {
+            gm.analytics.track('collection_item_unlocked', { item: result.imageId, series: ser.info.id });
+            gm.analytics.track('collection_series_progressed', { series: ser.info.id, count: ser.after, total: ser.total });
+            if (ser.justCompleted) gm.analytics.track('collection_series_completed', { series: ser.info.id });
+        }
+
         const L = this.L;
         const art = gm.resolveArt(result.imageId)!;
         const W = L.w - Theme.gutter * 2;
@@ -66,7 +74,8 @@ export class ResultPage extends BasePage {
         const hasShare = session.mode !== 'classic';
         const shareH = hasShare ? 120 + (session.mode === 'challenge-create' ? 70 : 0) : 0;
         const buttonsTop = btnY0 + 46 + shareH;
-        const extraH = compare ? 186 : daily ? 166 : 0;
+        const hasSeries = !!rec.series;
+        const extraH = (compare ? 186 : daily ? 166 : 0) + (hasSeries ? 110 : 0);
         const avail = L.contentTop - 20 - buttonsTop;
         const artSize = Math.max(120, Math.min(340, avail - (150 + 254 + extraH + 70)));
         // 高屏：内容整体下移，使其在标题与按钮之间居中
@@ -79,12 +88,6 @@ export class ResultPage extends BasePage {
         const frame = artFrame(c, gm.textures.art(art.id), artSize, 0, artY, art.tint);
         frame.setScale(0.6, 0.6, 1);
         tween(frame).to(0.35, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' }).start();
-        if (rec.newlyCollected && !isCustomId(result.imageId)) {
-            const badge = panel(c, 190, 52, { fill: P.mint2, border: P.ink, step: Theme.px, shadow: P.mint3 }, artSize / 2 - 10, artY + artSize / 2 - 26);
-            label(badge, '新作品收藏', Theme.font.tiny, { bold: true });
-            badge.angle = -8;
-            popIn(badge, 0.5);
-        }
 
         // 星星
         const starY = artY - artSize / 2 - 76;
@@ -137,8 +140,11 @@ export class ResultPage extends BasePage {
 
         // 模式附加区：好友对比 / 每日结果卡片 / 提示
         let extraBottom = statsY - statsH / 2 - 24;
+        if (rec.series) extraBottom = this.buildSeriesPanel(rec.series, rec.newlyCollected, extraBottom, W) - 16;
         if (compare) extraBottom = this.buildCompare(compare, extraBottom, W) - 16;
         else if (daily) extraBottom = this.buildDailyCard(daily, result.imageId, extraBottom, W) - 16;
+        // 首次解锁：稍等星星动画结束后，弹出收藏卡片庆祝（重复完成不弹）
+        if (ser && rec.newlyCollected) tween(this.content).delay(1.5).call(() => this.showUnlock(ser, art.name, art.story, result.imageId)).start();
         if (rec.newlyUnlocked.length) {
             this.sm.toast(`解锁新图：${rec.newlyUnlocked.map((a) => a.name).join('、')}`, 2.4);
         }
@@ -192,6 +198,58 @@ export class ResultPage extends BasePage {
             home.node.setPosition(0, btnY + (extraBottom > btnY + 160 ? 80 : 70));
             home.node.on(Node.EventType.TOUCH_END, () => this.backHome());
         }
+    }
+
+    /** 作品所属系列的进度条；重复完成时说明离系列奖励还差几件 */
+    private buildSeriesPanel(ser: SeriesUpdate, first: boolean, top: number, W: number): number {
+        const gm = this.gm;
+        const h = 96;
+        const p = panel(this.content, W, h, { fill: P.white, border: ser.info.reward.color, shadow: undefined, step: Theme.px }, 0, top - h / 2);
+        label(p, `${ser.info.name}系列  ${ser.after}/${ser.total}`, Theme.font.small, { bold: true, align: 'left', width: W - 200 }).node.setPosition(-W / 2 + 26, h / 2 - 28);
+        const left = ser.total - ser.after;
+        const note = first ? (ser.justCompleted ? '系列集齐！奖励已解锁' : '新作品已加入收藏') : left > 0 ? `距离系列奖励还差 ${left} 件` : '系列奖励已获得';
+        label(p, note, Theme.font.tiny, { color: first ? P.rose2 : P.ink2, bold: true, align: 'right', width: 280 }).node.setPosition(W / 2 - 26, h / 2 - 28);
+        segmentBar(p, ser.total, ser.after, W - 52, 16, ser.info.reward.color, 0, -h / 2 + 26);
+        onTap(p, () => {
+            gm.audio.play('click');
+            this.sm.go('series', { id: ser.info.id });
+        });
+        popIn(p, 0.6);
+        return top - h;
+    }
+
+    /** 新作品收藏卡：展示完整作品、系列进度，并引导查看收藏/领取系列奖励 */
+    private showUnlock(ser: SeriesUpdate, name: string, story: string, imageId: string): void {
+        const gm = this.gm;
+        if (this.sm.currentName !== 'result' || this.sm.hasModal) return;
+        const w = Math.min(this.L.w - 48, 640);
+        const h = 1010;
+        const color = ser.info.reward.color;
+        const card = this.sm.openModal(w, h, { closeOnMask: false });
+        const ribbon = panel(card, w - 120, 76, { fill: P.rose, border: P.ink, shadow: P.rose2, step: Theme.px }, 0, h / 2 - 58);
+        label(ribbon, '新作品已加入收藏！', Theme.font.h2, { bold: true, color: P.white });
+        const art = artFrame(card, gm.textures.art(imageId), 380, 0, h / 2 - 330, 'pink');
+        popIn(art, 0.1, 30);
+        const spark = [[-250, 110], [250, 80], [-230, -150], [240, -170]];
+        spark.forEach(([x, y], i) => {
+            const sp = sprite(card, gm.textures.icon('sparkle', i % 2 ? P.gold : P.rose, P.white), 34, 34, x, h / 2 - 330 + y);
+            tween(sp.node).repeatForever(tween().to(0.5 + i * 0.1, { scale: new Vec3(1.35, 1.35, 1) }).to(0.5 + i * 0.1, { scale: new Vec3(0.8, 0.8, 1) })).start();
+        });
+        label(card, name, Theme.font.title, { bold: true }).node.setPosition(0, h / 2 - 590);
+        label(card, `“${story}”`, Theme.font.small - 2, { color: P.ink2, width: w - 90, wrap: true }).node.setPosition(0, h / 2 - 650);
+        label(card, `${ser.info.name}系列  ${ser.after}/${ser.total}`, Theme.font.body, { bold: true, color }).node.setPosition(0, h / 2 - 718);
+        segmentBar(card, ser.total, ser.after, w - 140, 24, color, 0, h / 2 - 752);
+        const left = ser.total - ser.after;
+        const note = ser.justCompleted ? '系列集齐啦！奖励已经为你解锁' : left === 1 ? '只差最后 1 件就能集齐，加油！' : `再收集 ${left} 件，获得徽章、头像框和专属背景`;
+        label(card, note, Theme.font.small - 2, { color: P.rose2, bold: true, width: w - 80 }).node.setPosition(0, h / 2 - 794);
+        if (ser.justCompleted) {
+            button(card, { w: w - 100, h: 88, text: '领取系列奖励', style: 'primary', icon: gm.textures.icon('crown', P.white, P.white), onClick: () => { this.sm.closeModal(); this.sm.go('reward', { id: ser.info.id }); } }, 0, -h / 2 + 150);
+        } else {
+            button(card, { w: w - 100, h: 88, text: '查看收藏', style: 'primary', icon: gm.textures.icon('book', P.white, P.white), onClick: () => { this.sm.closeModal(); this.sm.go('series', { id: ser.info.id }); } }, 0, -h / 2 + 150);
+        }
+        button(card, { w: w - 100, h: 80, text: '继续', style: 'secondary', onClick: () => this.sm.closeModal() }, 0, -h / 2 + 50);
+        gm.audio.play('star', 0.9);
+        gm.vibrate();
     }
 
     onBack(): boolean {

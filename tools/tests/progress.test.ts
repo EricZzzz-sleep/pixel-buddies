@@ -51,7 +51,7 @@ test('存档：v1 旧存档迁移到 v2，保留成绩与设置', () => {
     storage.setItem(SAVE_KEY, JSON.stringify({ version: 1, createdAt: 500, unlocked: ['shiba'], best: { shiba_4: { time: 50, moves: 20, stars: 2 } }, plays: 3, sound: false, tutorialDone: true }));
     const s = new SaveManager(storage, () => 9999);
     const c = new CollectionManager(s);
-    assert.equal(s.data.version, 2);
+    assert.equal(s.data.version, SAVE_VERSION);
     assert.equal(s.data.firstLaunchAt, 500);
     assert.ok(c.isCollected('shiba'));
     assert.equal(c.getRecord('shiba', 4)!.bestTimeMs, 50000);
@@ -60,7 +60,7 @@ test('存档：v1 旧存档迁移到 v2，保留成绩与设置', () => {
     assert.equal(s.data.settings.sfx, false);
     assert.equal(s.data.tutorial.puzzleBasics, true);
     // 迁移结果已写回
-    assert.equal(JSON.parse(storage.getItem(SAVE_KEY)!).version, 2);
+    assert.equal(JSON.parse(storage.getItem(SAVE_KEY)!).version, SAVE_VERSION);
 });
 
 test('存档：存储写入失败时不抛错并标记', () => {

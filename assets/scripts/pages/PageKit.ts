@@ -1,5 +1,6 @@
 import { Graphics, Label, Node, SpriteFrame } from 'cc';
 import { ArtCategory, ArtInfo, CATEGORY_LABEL, CATEGORY_ORDER, getArt } from '../art/ArtCatalog';
+import { SeriesInfo } from '../collection/SeriesCatalog';
 import { P } from '../art/Palette';
 import { beginnerSwaps, DIFFICULTIES, GridSize, misplacedCount, recommendedGrid, SUPPORTED_GRIDS } from '../config/GameConfig';
 import { formatDuration } from '../core/GameTimer';
@@ -274,3 +275,74 @@ export function setLabel(l: Label | null, s: string): void {
 }
 
 export { makeNode };
+
+
+// ---------------------------------------------------------------- 收藏系统共用组件
+
+/** 分段进度条：每一件作品一格，已收集的格子填色 */
+export function segmentBar(parent: Node, total: number, filled: number, w: number, h: number, color: number, x = 0, y = 0): Node {
+    const n = makeNode('Segments', parent, w, h, x, y);
+    const g = n.addComponent(Graphics);
+    const gap = 6;
+    const sw = (w - gap * (total - 1)) / total;
+    for (let i = 0; i < total; i++) {
+        g.fillColor = hex(i < filled ? color : P.cream3);
+        g.rect(-w / 2 + i * (sw + gap), -h / 2, sw, h);
+        g.fill();
+        if (i < filled) {
+            g.fillColor = hex(P.white, 110);
+            g.rect(-w / 2 + i * (sw + gap), h / 2 - h * 0.3, sw, h * 0.3);
+            g.fill();
+        }
+    }
+    return n;
+}
+
+/** 系列奖励三件套：徽章 / 头像框 / 收藏册背景。未获得时灰显并加锁 */
+export function rewardRow(parent: Node, s: SeriesInfo, earned: boolean, w: number, x: number, y: number): Node {
+    const gm = GameManager.I;
+    const row = makeNode('Rewards', parent, w, 76, x, y);
+    const items: Array<[string, string]> = [['badge', s.reward.badge], ['frame', s.reward.frame], ['wall', s.reward.background]];
+    const cw = (w - 16) / 3;
+    items.forEach(([icon, name], i) => {
+        const cx = -w / 2 + cw / 2 + i * (cw + 8);
+        const c = panel(row, cw, 76, { fill: earned ? P.white : P.cream2, border: earned ? s.reward.color : P.cream3, shadow: undefined, step: 3 }, cx, 0);
+        sprite(c, gm.textures.icon(earned ? icon : 'lock', earned ? s.reward.color : P.grey2, P.white), 30, 30, 0, 14);
+        label(c, name, Theme.font.tiny - 2, { bold: true, color: earned ? P.ink : Theme.textMuted, width: cw - 8 }).node.setPosition(0, -20);
+    });
+    return row;
+}
+
+export function fmtDateTime(t: number): string {
+    if (!t) return '';
+    const d = new Date(t);
+    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
+/** 作品详情：大图、名称、简介、所属系列、收藏时间、最佳成绩与星星 */
+export function openItemDetail(itemId: string): void {
+    const gm = GameManager.I;
+    const d = gm.collection.itemDetail(itemId);
+    if (!d) return;
+    const w = Math.min(gm.layout.w - 48, 640);
+    const h = 980;
+    const card = gm.scene.openModal(w, h);
+    if (d.series) {
+        const chip = panel(card, 250, 46, { fill: d.series.reward.color, border: P.ink, shadow: undefined, step: 3 }, 0, h / 2 - 50);
+        label(chip, `${d.series.name} · 系列 0${d.series.no}`, Theme.font.small - 2, { bold: true, color: P.white });
+    }
+    artFrame(card, gm.textures.art(d.art.id), 380, 0, h / 2 - 300, d.art.tint);
+    label(card, d.art.name, Theme.font.title, { bold: true }).node.setPosition(0, h / 2 - 560);
+    label(card, `“${d.art.story}”`, Theme.font.small, { color: P.ink2, width: w - 90, wrap: true }).node.setPosition(0, h / 2 - 622);
+    const info = panel(card, w - 60, 150, { fill: P.white, border: P.cream3, shadow: undefined, step: Theme.px }, 0, -h / 2 + 250);
+    const line = (i: number, k: string, v: string) => {
+        label(info, k, Theme.font.small - 2, { color: Theme.textMuted, align: 'left' }).node.setPosition(-(w - 60) / 2 + 24, 38 - i * 38);
+        label(info, v, Theme.font.small, { bold: true, align: 'right' }).node.setPosition((w - 60) / 2 - 24, 38 - i * 38);
+    };
+    line(0, '收藏时间', fmtDateTime(d.unlockedAt));
+    line(1, '最佳成绩', d.bestTimeMs ? `${formatDuration(d.bestTimeMs)} · ${d.bestMoves} 步` : '—');
+    label(info, '获得星星', Theme.font.small - 2, { color: Theme.textMuted, align: 'left' }).node.setPosition(-(w - 60) / 2 + 24, 38 - 76);
+    starRow(info, starFrames(), d.bestStars, 3, 26, 6).setPosition((w - 60) / 2 - 70, 38 - 76);
+    const art = d.art;
+    button(card, { w: w - 100, h: 90, text: '再拼一次', style: 'primary', onClick: () => { gm.scene.closeModal(); openDifficultySheet(art, (g) => Flow.classic(art.id, g)); } }, 0, -h / 2 + 74);
+}

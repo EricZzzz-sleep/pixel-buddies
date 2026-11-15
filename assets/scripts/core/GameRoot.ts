@@ -1,5 +1,5 @@
 import { _decorator, Canvas, Component, Director, director, game, Game, Graphics, Node, ResolutionPolicy, Scene, screen, Sprite, sys, view } from 'cc';
-import { EDITOR } from 'cc/env';
+import { DEBUG, EDITOR } from 'cc/env';
 import { P } from '../art/Palette';
 import { AudioManager } from '../audio/AudioManager';
 import { CHALLENGE } from '../config/GameConfig';
@@ -14,6 +14,8 @@ import { ResultPage } from '../pages/ResultPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { WorkshopPage } from '../pages/WorkshopPage';
 import { PolicyPage } from '../pages/PolicyPage';
+import { SeriesPage } from '../pages/SeriesPage';
+import { RewardPage } from '../pages/RewardPage';
 import { createPlatformAdapter } from '../platform/PlatformFactory';
 import { PlatformAdapter } from '../platform/PlatformAdapter';
 import { hex, Theme } from '../ui/Theme';
@@ -46,6 +48,9 @@ export class GameRoot extends Component {
 
         const platform = createPlatformAdapter(String(sys.platform));
         this.gm = new GameManager(platform);
+        this.gm.analytics.setDebug(DEBUG);
+        // 旧存档里已经集齐的系列：补发奖励记录（升级后第一次进入收藏册会看到庆祝页）
+        this.gm.collection.syncRewards();
         this.gm.layout = this.computeLayout(platform);
         console.log(`[PixelBuddies] 平台：${platform.displayName}，可视区域 ${this.gm.layout.w}×${Math.round(this.gm.layout.h)}`);
 
@@ -72,6 +77,8 @@ export class GameRoot extends Component {
         this.sm.register(new ChallengePage(this.sm, 'challenge'));
         this.sm.register(new WorkshopPage(this.sm, 'workshop'));
         this.sm.register(new PolicyPage(this.sm, 'policy'));
+        this.sm.register(new SeriesPage(this.sm, 'series'));
+        this.sm.register(new RewardPage(this.sm, 'reward'));
 
         this.bindLifecycle(platform);
         this.gm.share.registerPassiveShare();

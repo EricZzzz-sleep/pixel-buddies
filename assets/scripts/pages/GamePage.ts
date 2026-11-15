@@ -157,7 +157,9 @@ export class GamePage extends BasePage {
         const d = DIFFICULTIES[session.spec.grid];
         this.tagLabel.string = `${MODE_TAG[session.mode]} · ${d.label} ${d.desc}`;
         gm.collection.recordPlayStarted();
-        gm.analytics.track('puzzle_start', { mode: session.mode, image: session.spec.imageId, grid: session.spec.grid });
+        // 同一张作品已经收藏过：算“重玩”（用于判断收藏系统是否带来复玩）
+        if (gm.collection.isCollected(session.spec.imageId)) gm.analytics.track('puzzle_replayed', { image: session.spec.imageId, grid: session.spec.grid, mode: session.mode });
+        gm.analytics.track('puzzle_started', { mode: session.mode, image: session.spec.imageId, grid: session.spec.grid });
         this.refSprite.spriteFrame = gm.textures.art(session.spec.imageId);
         this.refreshHud(true);
         // 教程：只在玩家还没学过时出现，且只出现在入门拼图或玩家的第一局
@@ -232,7 +234,7 @@ export class GamePage extends BasePage {
         if (!h) return;
         gm.audio.play('pick', 0.7);
         this.board.showHint(h.fromCell, h.toCell);
-        gm.analytics.track('hint', { left: this.pm.hintsLeft });
+        gm.analytics.track('hint_used', { left: this.pm.hintsLeft });
         this.refreshHud(true);
     }
 
@@ -335,7 +337,7 @@ export class GamePage extends BasePage {
         });
         const bp = this.board.node.position;
         this.scheduleCall(0.6, () => this.fx.confetti(this.L.w, this.L.h / 2, bp.y - 200, 46));
-        gm.analytics.track('puzzle_complete', { mode: this.session.mode, grid: result.grid, time: Math.round(result.timeMs / 1000), moves: result.moves });
+        gm.analytics.track('puzzle_completed', { mode: this.session.mode, grid: result.grid, time: Math.round(result.timeMs / 1000), moves: result.moves });
         const payload: ResultPayload = { session: this.session, result };
         const goResult = () => this.sm.go('result', payload, { replace: true });
         // 教程庆祝卡片还在时，等玩家点“看结果”再进入结算页
