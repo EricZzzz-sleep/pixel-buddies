@@ -60,3 +60,7 @@ python3 tools/gen-music.py music-out sweet_party  # 只生成一首
 5. 导出单声道 64kbps mp3。
 
 如果这段录音里演奏的是别人写的曲子，上线前需要拿到曲作者授权；只有自己创作和演奏的内容才能直接商用。
+
+## 小游戏分包
+
+`assets/music` 在微信/抖音构建中设为“小游戏分包”（`settings/v2/packages/builder.json` 的 `bundleConfig.custom.pb_music_cfg`，`assets/music.meta` 引用它），音乐不占 4MB 主包。构建后主包约 2.4MB，分包约 2.7MB。
