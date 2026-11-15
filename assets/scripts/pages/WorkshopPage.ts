@@ -2,7 +2,7 @@ import { Label, Node, Sprite, UITransform } from 'cc';
 import { MAX_CUSTOM, workToArtInfo } from '../art/CustomArtStore';
 import { P } from '../art/Palette';
 import { PixelCanvas } from '../art/PixelCanvas';
-import { ART_SIZE } from '../config/GameConfig';
+import { ART_SIZE, SUPPORTED_GRIDS } from '../config/GameConfig';
 import { convertToPixelArt, MAX_INPUT_SIDE, RGBAImage } from '../imaging/PixelArtConverter';
 import { DecodedImage } from '../platform/PlatformAdapter';
 import { Theme } from '../ui/Theme';
@@ -236,7 +236,7 @@ export class WorkshopPage extends BasePage {
             const yy = hh / 2 - cw / 2 - 10 - row * (cw + 50);
             const card = panel(h, cw, cw, { fill: P.white, border: P.cream3, step: Theme.px, shadow: Theme.shadow }, x, yy);
             sprite(card, gm.textures.art(w.id), cw - 24, cw - 24);
-            const rec = [4, 5, 6].map((g) => gm.collection.getRecord(w.id, g as 4 | 5 | 6)).filter(Boolean);
+            const rec = SUPPORTED_GRIDS.map((g) => gm.collection.getRecord(w.id, g)).filter(Boolean);
             const best = rec.length ? Math.max(...rec.map((r) => r!.bestStars)) : 0;
             label(h, `${w.name}${best ? ' ' + '★'.repeat(best) : ''}`, Theme.font.tiny, { color: P.ink2, bold: true }).node.setPosition(x, yy - cw / 2 - 20);
             onTap(card, () => {

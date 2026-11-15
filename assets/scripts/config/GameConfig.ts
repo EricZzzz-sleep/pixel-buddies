@@ -3,7 +3,7 @@
  * 难度、评分阈值、提示次数、每日挑战规则都集中在这里，避免在逻辑中硬编码。
  */
 
-export type GridSize = 4 | 5 | 6;
+export type GridSize = 3 | 4 | 5 | 6;
 
 export interface StarThresholds {
     /** 三星时间上限（秒） */
@@ -24,22 +24,42 @@ export interface DifficultyConfig {
     desc: string;
     /** 每局免费“定位提示”次数 */
     freeHints: number;
+    /**
+     * 打乱比例（0~1）：被打乱的方块占比，其余方块开局就在正确位置并锁定。
+     * 难度越低打乱越少，新手第一局不会一上来就面对整盘乱块。
+     */
+    scramble: number;
+    /** 拖动方块时轻轻高亮它的正确位置（新手辅助） */
+    dragGuide: boolean;
     stars: StarThresholds;
 }
 
 export const DIFFICULTIES: Record<GridSize, DifficultyConfig> = {
+    3: {
+        grid: 3,
+        label: '入门',
+        desc: '3×3 · 9 块',
+        freeHints: 3,
+        scramble: 0.78,
+        dragGuide: true,
+        stars: { threeStarSeconds: 30, twoStarSeconds: 80, threeStarMoveRatio: 1.34, twoStarMoveRatio: 2.0 },
+    },
     4: {
         grid: 4,
         label: '简单',
         desc: '4×4 · 16 块',
         freeHints: 3,
-        stars: { threeStarSeconds: 60, twoStarSeconds: 150, threeStarMoveRatio: 1.25, twoStarMoveRatio: 1.8 },
+        scramble: 0.6,
+        dragGuide: false,
+        stars: { threeStarSeconds: 45, twoStarSeconds: 120, threeStarMoveRatio: 1.25, twoStarMoveRatio: 1.8 },
     },
     5: {
         grid: 5,
         label: '普通',
         desc: '5×5 · 25 块',
         freeHints: 3,
+        scramble: 0.85,
+        dragGuide: false,
         stars: { threeStarSeconds: 120, twoStarSeconds: 270, threeStarMoveRatio: 1.3, twoStarMoveRatio: 1.9 },
     },
     6: {
@@ -47,14 +67,19 @@ export const DIFFICULTIES: Record<GridSize, DifficultyConfig> = {
         label: '困难',
         desc: '6×6 · 36 块',
         freeHints: 4,
+        scramble: 1,
+        dragGuide: false,
         stars: { threeStarSeconds: 210, twoStarSeconds: 420, threeStarMoveRatio: 1.35, twoStarMoveRatio: 2.0 },
     },
 };
 
-export const SUPPORTED_GRIDS: GridSize[] = [4, 5, 6];
+export const SUPPORTED_GRIDS: GridSize[] = [3, 4, 5, 6];
+
+/** 新手（还没完成过任何一局）推荐的难度 */
+export const BEGINNER_GRID: GridSize = 3;
 
 export function isGridSize(v: unknown): v is GridSize {
-    return v === 4 || v === 5 || v === 6;
+    return v === 3 || v === 4 || v === 5 || v === 6;
 }
 
 /**
@@ -73,8 +98,8 @@ export const GAMEPLAY = {
 };
 
 export const DAILY = {
-    /** 每日挑战固定难度 */
-    grid: 5 as GridSize,
+    /** 每日挑战固定难度（简单 4×4，人人都能完成） */
+    grid: 4 as GridSize,
     /** 每日挑战种子盐值；修改会改变所有日期的题目，请勿随意改动 */
     salt: 'pixel-buddies-daily-v1',
 };

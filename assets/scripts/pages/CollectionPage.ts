@@ -71,7 +71,7 @@ export class CollectionPage extends BasePage {
     private openDetail(e: CollectionEntry): void {
         const gm = this.gm;
         const w = Math.min(this.L.w - 48, 640);
-        const h = 960;
+        const h = 1030;
         const card = this.sm.openModal(w, h);
         artFrame(card, gm.textures.art(e.art.id), 320, 0, h / 2 - 210, e.art.tint);
         label(card, e.art.name, Theme.font.title, { bold: true }).node.setPosition(0, h / 2 - 410);

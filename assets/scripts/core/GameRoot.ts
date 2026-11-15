@@ -1,4 +1,4 @@
-import { _decorator, Canvas, Component, Director, director, game, Game, Graphics, Node, ResolutionPolicy, Scene, Sprite, sys, view } from 'cc';
+import { _decorator, Canvas, Component, Director, director, game, Game, Graphics, Node, ResolutionPolicy, Scene, screen, Sprite, sys, view } from 'cc';
 import { EDITOR } from 'cc/env';
 import { P } from '../art/Palette';
 import { AudioManager } from '../audio/AudioManager';
@@ -36,8 +36,13 @@ export class GameRoot extends Component {
     private sm!: SceneManager;
 
     onLoad(): void {
-        // 竖屏 9:16 设计，宽度适配：更高的屏幕获得更多纵向空间，按钮不会被裁掉
-        view.setDesignResolutionSize(DESIGN_W, DESIGN_H, ResolutionPolicy.FIXED_WIDTH);
+        // 竖屏 9:16 设计：
+        // - 比 9:16 更高的屏幕（绝大多数手机）：宽度适配，多出来的纵向空间留给布局；
+        // - 比 9:16 更矮/更宽的屏幕（iPad、编辑器预览窗口、折叠屏展开）：高度适配，
+        //   内容保持 720 宽居中，两侧只铺背景，避免按钮互相重叠。
+        const frame = screen.windowSize;
+        const tall = frame.width <= 0 || frame.height / frame.width >= DESIGN_H / DESIGN_W - 0.001;
+        view.setDesignResolutionSize(DESIGN_W, DESIGN_H, tall ? ResolutionPolicy.FIXED_WIDTH : ResolutionPolicy.FIXED_HEIGHT);
 
         const platform = createPlatformAdapter(String(sys.platform));
         this.gm = new GameManager(platform);
@@ -47,8 +52,8 @@ export class GameRoot extends Component {
         const L = this.gm.layout;
         this.buildBackground(L);
         const pageLayer = makeNode('Pages', this.node, L.w, L.h);
-        const overlay = makeNode('Overlay', this.node, L.w, L.h);
-        this.sm = new SceneManager(pageLayer, overlay, L.w, L.h);
+        const overlay = makeNode('Overlay', this.node, L.fullW, L.fullH);
+        this.sm = new SceneManager(pageLayer, overlay, L.fullW, L.fullH);
         this.gm.scene = this.sm;
 
         const audio = new AudioManager(this.node);
@@ -117,10 +122,13 @@ export class GameRoot extends Component {
     /** 计算设计坐标下的安全区与头部位置（避开刘海、Home 条与小游戏右上角胶囊按钮） */
     private computeLayout(platform: PlatformAdapter): Layout {
         const vis = view.getVisibleSize();
-        const w = vis.width;
-        const h = vis.height;
+        const fullW = vis.width;
+        const fullH = vis.height;
+        // 内容区：最宽 720（矮屏时居中，两侧留背景）
+        const w = Math.min(fullW, DESIGN_W);
+        const h = fullH;
         const win = platform.getWindowSize();
-        const scale = win.width > 0 ? w / win.width : 1;
+        const scale = win.width > 0 ? fullW / win.width : 1;
 
         const ins = platform.getSafeInsets();
         let safeTop = ins.top * scale;
@@ -143,17 +151,17 @@ export class GameRoot extends Component {
         if (menu) {
             const centerFromTop = (menu.top + menu.height / 2) * scale;
             headerY = Math.min(headerY, h / 2 - centerFromTop);
-            headerRight = Math.min(headerRight, menu.left * scale - w / 2 - 16);
+            headerRight = Math.min(headerRight, menu.left * scale - fullW / 2 - 16);
         }
-        return { w, h, safeTop, safeBottom, headerY, headerRight, contentTop: headerY - 64 };
+        return { w, h, fullW, fullH, safeTop, safeBottom, headerY, headerRight, contentTop: headerY - 64 };
     }
 
     /** 全局背景：奶油底色 + 像素波点平铺（一个 Sprite，开销极低） */
     private buildBackground(L: Layout): void {
-        const bg = makeNode('Background', this.node, L.w, L.h);
+        const bg = makeNode('Background', this.node, L.fullW, L.fullH);
         const g = bg.addComponent(Graphics);
         g.fillColor = hex(Theme.bg);
-        g.rect(-L.w / 2, -L.h / 2, L.w, L.h);
+        g.rect(-L.fullW / 2, -L.fullH / 2, L.fullW, L.fullH);
         g.fill();
         const tile = this.gm.textures.pattern('bgdots', (c) => {
             c.fill(Theme.bg);
@@ -162,7 +170,7 @@ export class GameRoot extends Component {
             c.px(12, 3, P.pink);
             c.px(4, 12, P.mint);
         }, 16);
-        const tiled = makeNode('Dots', bg, L.w / 3, L.h / 3);
+        const tiled = makeNode('Dots', bg, L.fullW / 3, L.fullH / 3);
         tiled.setScale(3, 3, 1);
         const sp = tiled.addComponent(Sprite);
         sp.type = Sprite.Type.TILED;

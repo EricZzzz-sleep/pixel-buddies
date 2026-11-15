@@ -99,7 +99,7 @@ test('收藏与解锁：完成即收藏，最佳成绩只在更好时更新，�
     assert.ok(entries.every((e) => e.art.category === 'animal'));
     assert.equal(entries.find((e) => e.art.id === 'cat_orange')!.bestStars, 3);
     assert.equal(c.collectedCount(), 1);
-    assert.equal(c.maxStars(), ART_LIST.length * 9);
+    assert.equal(c.maxStars(), ART_LIST.length * 12);
 });
 
 test('每日挑战：同一天任何时刻、任何实例都得到同一道题', () => {
@@ -112,7 +112,7 @@ test('每日挑战：同一天任何时刻、任何实例都得到同一道题',
     assert.deepEqual(d2.getToday(), a);
     // 打乱结果也一致
     assert.deepEqual(generateLayout(d1.getToday()).order, generateLayout(d2.getToday()).order);
-    assert.equal(a.grid, 5);
+    assert.equal(a.grid, 4);
 });
 
 test('每日挑战：相邻两天图片不同，一年内覆盖全部图片', () => {

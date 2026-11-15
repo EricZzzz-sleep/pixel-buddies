@@ -340,11 +340,11 @@ export class GamePage extends BasePage {
         const gm = this.gm;
         this.pauseTimer(true);
         const L = this.L;
-        const node = makeNode('Tutorial', this.root, L.w, L.h);
+        const node = makeNode('Tutorial', this.root, L.fullW, L.fullH);
         node.addComponent(BlockInputEvents);
         const dim = node.addComponent(Graphics);
         dim.fillColor = hex(P.ink, 110);
-        dim.rect(-L.w / 2, -L.h / 2, L.w, L.h);
+        dim.rect(-L.fullW / 2, -L.fullH / 2, L.fullW, L.fullH);
         dim.fill();
         const bp = this.board.node.position;
         const c0 = this.board.center(0), c1 = this.board.center(Math.min(5, this.pm!.n - 1));

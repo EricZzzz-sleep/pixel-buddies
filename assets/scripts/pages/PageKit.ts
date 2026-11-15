@@ -1,7 +1,7 @@
 import { Label, Node, SpriteFrame } from 'cc';
 import { ArtCategory, ArtInfo, CATEGORY_LABEL, CATEGORY_ORDER, getArt } from '../art/ArtCatalog';
 import { P } from '../art/Palette';
-import { DIFFICULTIES, GridSize, SUPPORTED_GRIDS } from '../config/GameConfig';
+import { BEGINNER_GRID, DIFFICULTIES, GridSize, SUPPORTED_GRIDS } from '../config/GameConfig';
 import { formatDuration } from '../core/GameTimer';
 import { GameManager, PlaySession } from '../core/GameManager';
 import { randomSeed } from '../core/Random';
@@ -112,7 +112,9 @@ export function openDifficultySheet(art: ArtInfo, onPick: (grid: GridSize) => vo
     const gm = GameManager.I;
     const sm = gm.scene;
     const w = Math.min(gm.layout.w - 48, 640);
-    const h = 900;
+    const h = 1010;
+    // 还没完成过任何一局：推荐入门难度
+    const beginner = gm.save.data.totalCompletions === 0;
     const card = sm.openModal(w, h);
     const t = label(card, title, Theme.font.h2, { bold: true });
     t.node.setPosition(0, h / 2 - 56);
@@ -121,14 +123,18 @@ export function openDifficultySheet(art: ArtInfo, onPick: (grid: GridSize) => vo
     name.node.setPosition(0, h / 2 - 350);
     const story = label(card, art.story, Theme.font.small, { color: P.ink2, width: w - 80, wrap: true });
     story.node.setPosition(0, h / 2 - 396);
-    const colors = ['mint', 'sky', 'lilac'] as const;
+    const colors = ['butter', 'mint', 'sky', 'lilac'] as const;
     SUPPORTED_GRIDS.forEach((g, i) => {
         const d = DIFFICULTIES[g];
         const rec = gm.collection.getRecord(art.id, g);
-        const sub = rec ? `最佳 ${formatDuration(rec.bestTimeMs)} · ${rec.bestMoves} 步 · ${'★'.repeat(rec.bestStars)}${'☆'.repeat(3 - rec.bestStars)}` : '尚未完成';
+        const sub = rec
+            ? `最佳 ${formatDuration(rec.bestTimeMs)} · ${rec.bestMoves} 步 · ${'★'.repeat(rec.bestStars)}${'☆'.repeat(3 - rec.bestStars)}`
+            : beginner && g === BEGINNER_GRID
+              ? '推荐第一次玩'
+              : '尚未完成';
         button(card, {
             w: w - 80,
-            h: 104,
+            h: 98,
             text: `${d.label}  ${d.desc}`,
             sub,
             style: colors[i],
@@ -137,7 +143,7 @@ export function openDifficultySheet(art: ArtInfo, onPick: (grid: GridSize) => vo
                 sm.closeModal();
                 onPick(g);
             },
-        }, 0, h / 2 - 500 - i * 124);
+        }, 0, h / 2 - 494 - i * 116);
     });
     const close = label(card, '轻点空白处关闭', Theme.font.tiny, { color: Theme.textMuted });
     close.node.setPosition(0, -h / 2 + 30);

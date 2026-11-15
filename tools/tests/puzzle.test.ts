@@ -6,7 +6,8 @@ import { PuzzleManager } from '../../assets/scripts/puzzle/PuzzleManager';
 import { computeStars, isBetterRecord } from '../../assets/scripts/puzzle/PuzzleScoring';
 import { GridSize } from '../../assets/scripts/config/GameConfig';
 import { SeededRandom } from '../../assets/scripts/core/Random';
-import { shuffleOrder } from '../../assets/scripts/puzzle/PuzzleShuffle';
+import { scrambledCount, shuffleOrder } from '../../assets/scripts/puzzle/PuzzleShuffle';
+import { DIFFICULTIES } from '../../assets/scripts/config/GameConfig';
 
 /** 用“把正确方块换到位”的贪心策略还原，返回步数 */
 function solveGreedy(pm: PuzzleManager): number {
@@ -22,15 +23,16 @@ function solveGreedy(pm: PuzzleManager): number {
     return steps;
 }
 
-for (const grid of [4, 5, 6] as GridSize[]) {
-    test(`${grid}×${grid}：生成合法、无重复、无丢失、无不动点、非完成态（3000 个种子）`, () => {
+for (const grid of [3, 4, 5, 6] as GridSize[]) {
+    test(`${grid}×${grid}：生成合法、无重复、无丢失、按难度只打乱部分方块、非完成态（3000 个种子）`, () => {
         const n = grid * grid;
+        const m = scrambledCount(n, DIFFICULTIES[grid].scramble);
         for (let seed = 0; seed < 3000; seed++) {
             const l = generateLayout({ imageId: 'cat_orange', grid, seed });
             assert.equal(l.order.length, n);
             assert.ok(isPermutation(l.order, n), `seed ${seed} 不是排列`);
             assert.ok(!isSolved(l.order), `seed ${seed} 生成了已完成局面`);
-            assert.equal(countFixedPoints(l.order), 0, `seed ${seed} 有开局就归位的方块`);
+            assert.equal(countFixedPoints(l.order), n - m, `seed ${seed} 开局归位块数应为 ${n - m}`);
         }
     });
 
@@ -83,8 +85,9 @@ test('pieceSourceRect 切图坐标', () => {
 test('拖动交换：位置、步数、归位反馈、锁定已归位方块', () => {
     const pm = new PuzzleManager({ imageId: 'cat_orange', grid: 4, seed: 99 });
     assert.equal(pm.timer.started, false, '未操作前不计时');
-    // 找一个能让某块归位的交换
-    const target = 0;
+    // 找一个能让某块归位的交换：第一个未归位的格子
+    let target = 0;
+    while (pm.isCellCorrect(target)) target++;
     let from = -1;
     for (let j = 0; j < 16; j++) if (pm.pieceAt(j) === target) from = j;
     const before = pm.pieceAt(target);
@@ -96,7 +99,8 @@ test('拖动交换：位置、步数、归位反馈、锁定已归位方块', ()
     assert.ok(r.newlyCorrectCells.includes(target));
     assert.equal(pm.timer.started, true, '第一次有效操作开始计时');
     // 已归位方块被锁定
-    const other = from === 1 ? 2 : 1;
+    let other = 0;
+    while (other === target || other === from || pm.isCellCorrect(other)) other++;
     const locked = pm.trySwap(target, other);
     assert.equal(locked.swapped, false);
     assert.equal(locked.reason, 'locked');
@@ -190,4 +194,16 @@ test('最少交换步数计算', () => {
     assert.equal(minSwapsToSolve([0, 1, 2, 3]), 0);
     assert.equal(minSwapsToSolve([1, 0, 3, 2]), 2);
     assert.equal(minSwapsToSolve([1, 2, 3, 0]), 3);
+});
+
+test('难度梯度：入门 3×3 打乱最少且开启拖动引导；难度越高打乱越多', () => {
+    const counts = ([3, 4, 5, 6] as GridSize[]).map((g) => scrambledCount(g * g, DIFFICULTIES[g].scramble));
+    assert.deepEqual(counts, [7, 10, 21, 36]);
+    assert.equal(DIFFICULTIES[3].dragGuide, true);
+    assert.equal(DIFFICULTIES[4].dragGuide, false);
+    // 3×3 平均最少步数明显低于旧版“全部打乱”的 4×4（15 步左右）
+    let total = 0;
+    for (let seed = 0; seed < 200; seed++) total += new PuzzleManager({ imageId: 'bunny', grid: 3, seed }).optimalMoves;
+    assert.ok(total / 200 < 7, `3×3 平均最少步数 ${total / 200}`);
+    assert.equal(scrambledCount(9, 0), 2, '至少打乱 2 块');
 });

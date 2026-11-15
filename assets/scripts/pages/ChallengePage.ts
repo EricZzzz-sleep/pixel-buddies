@@ -36,7 +36,7 @@ export class ChallengePage extends BasePage {
         this.pickedLabel = label(create, '', Theme.font.tiny, { color: Theme.textMuted, align: 'right' });
         this.pickedLabel.node.setPosition(W / 2 - 28, createH / 2 - 44);
         this.pickerHolder = makeNode('Picker', create, W - 40, 130, 0, createH / 2 - 150);
-        const gw = (W - 56 - 24) / 3;
+        const gw = (W - 56 - 12 * (SUPPORTED_GRIDS.length - 1)) / SUPPORTED_GRIDS.length;
         SUPPORTED_GRIDS.forEach((g, i) => {
             this.gridBtns.push(
                 button(create, {

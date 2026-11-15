@@ -18,8 +18,12 @@ import type { SceneManager } from './SceneManager';
 
 /** 布局信息（设计分辨率坐标，页面原点在屏幕中心） */
 export interface Layout {
+    /** 内容区宽高（宽度最大 720） */
     w: number;
     h: number;
+    /** 整个可视区域（背景、遮罩铺满用） */
+    fullW: number;
+    fullH: number;
     /** 顶部安全距离（状态栏/刘海） */
     safeTop: number;
     /** 底部安全距离（Home 指示条） */

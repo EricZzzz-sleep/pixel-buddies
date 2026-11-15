@@ -1,4 +1,4 @@
-import { GridSize, isGridSize } from '../config/GameConfig';
+import { DIFFICULTIES, GridSize, isGridSize } from '../config/GameConfig';
 import { SeededRandom } from '../core/Random';
 import { shuffleOrder } from './PuzzleShuffle';
 import { isPermutation } from './PuzzleValidator';
@@ -34,7 +34,7 @@ export function generateLayout(spec: PuzzleSpec): PuzzleLayout {
     if (!spec.imageId) throw new Error('缺少图片 ID');
     const n = spec.grid * spec.grid;
     const rng = new SeededRandom(spec.seed >>> 0);
-    const order = shuffleOrder(n, rng);
+    const order = shuffleOrder(n, rng, DIFFICULTIES[spec.grid].scramble);
     return { imageId: spec.imageId, grid: spec.grid, seed: spec.seed >>> 0, order };
 }
 

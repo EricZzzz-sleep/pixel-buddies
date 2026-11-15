@@ -4,6 +4,7 @@ import { TextureFactory } from '../art/TextureFactory';
 import { hex, Theme } from '../ui/Theme';
 import { drawPanel, makeNode, sprite, opacityOf } from '../ui/UIKit';
 import { PuzzleManager, SwapOutcome } from './PuzzleManager';
+import { DIFFICULTIES } from '../config/GameConfig';
 import { PiecePool, PuzzlePiece } from './PuzzlePiece';
 
 export interface BoardCallbacks {
@@ -46,6 +47,9 @@ export class PuzzleBoard {
     private hoverCell = -1;
     private enabled = true;
     private solvedLook = false;
+    /** 新手辅助：拖动时高亮正确格 */
+    private guide = false;
+    private guideCell = -1;
 
     constructor(parent: Node, boardSize: number, private readonly textures: TextureFactory, private readonly cb: BoardCallbacks) {
         this.boardSize = boardSize;
@@ -76,6 +80,8 @@ export class PuzzleBoard {
         this.cell = this.inner / this.grid;
         this.enabled = true;
         this.solvedLook = false;
+        this.guide = DIFFICULTIES[pm.spec.grid].dragGuide;
+        this.guideCell = -1;
         this.drawBackground();
         const sz = this.cell - GAP;
         for (let c = 0; c < pm.n; c++) {
@@ -181,6 +187,7 @@ export class PuzzleBoard {
             piece.node.setSiblingIndex(this.pieceLayer.children.length - 1);
             tween(piece.node).to(0.08, { scale: new Vec3(1.1, 1.1, 1) }).start();
             piece.setGlow('selected');
+            this.showGuide(piece.pieceId);
             this.cb.onPick();
         }
         // 限制在棋盘范围内移动
@@ -192,6 +199,7 @@ export class PuzzleBoard {
             if (this.hoverCell >= 0 && this.pieces[this.hoverCell]) this.pieces[this.hoverCell].setGlow('none');
             this.hoverCell = valid;
             if (valid >= 0) this.pieces[valid].setGlow('target');
+            else if (this.guideCell >= 0 && this.pieces[this.guideCell]) this.pieces[this.guideCell].setGlow('hint');
         }
     }
 
@@ -201,6 +209,7 @@ export class PuzzleBoard {
         this.touchCell = -1;
         if (this.hoverCell >= 0 && this.pieces[this.hoverCell]) this.pieces[this.hoverCell].setGlow('none');
         this.hoverCell = -1;
+        this.hideGuide();
         if (this.dragging) {
             this.dragging = false;
             const p = this.local(e);
@@ -216,6 +225,7 @@ export class PuzzleBoard {
             const piece = this.pieces[from];
             piece.setGlow('selected');
             tween(piece.node).to(0.08, { scale: new Vec3(1.06, 1.06, 1) }).start();
+            this.showGuide(piece.pieceId);
             this.cb.onPick();
         } else if (this.selectedCell === from) {
             this.clearSelection();
@@ -236,12 +246,28 @@ export class PuzzleBoard {
             this.pieces[this.touchCell].moveTo(this.center(this.touchCell), 0.15);
         }
         if (this.hoverCell >= 0 && this.pieces[this.hoverCell]) this.pieces[this.hoverCell].setGlow('none');
+        this.hideGuide();
         this.touchCell = -1;
         this.hoverCell = -1;
         this.dragging = false;
     }
 
+    /** 新手辅助：高亮方块的正确格（方块 ID 即正确格索引） */
+    private showGuide(pieceId: number): void {
+        if (!this.guide || !this.pm) return;
+        this.hideGuide();
+        if (pieceId < 0 || pieceId >= this.pm.n || this.pm.isCellCorrect(pieceId)) return;
+        this.guideCell = pieceId;
+        this.pieces[pieceId].setGlow('hint');
+    }
+
+    private hideGuide(): void {
+        if (this.guideCell >= 0 && this.pieces[this.guideCell] && this.guideCell !== this.selectedCell) this.pieces[this.guideCell].setGlow('none');
+        this.guideCell = -1;
+    }
+
     private clearSelection(): void {
+        this.hideGuide();
         if (this.selectedCell >= 0 && this.pieces[this.selectedCell]) {
             const p = this.pieces[this.selectedCell];
             p.setGlow('none');
