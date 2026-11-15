@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "module": "ES2015",
+    "moduleResolution": "node",
+    "lib": [
+      "DOM",
+      "ES2017"
+    ],
+    "strict": true,
+    "strictPropertyInitialization": false,
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "experimentalDecorators": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "useDefineForClassFields": true,
+    "allowSyntheticDefaultImports": true,
+    "types": [
+      "@cocos/creator-types/engine"
+    ],
+    "typeRoots": [
+      "./node_modules"
+    ]
+  },
+  "include": [
+    "../assets/scripts/**/*.ts",
+    "./shims/*.d.ts"
+  ]
+}

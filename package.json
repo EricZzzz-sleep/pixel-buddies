@@ -1,0 +1,10 @@
+{
+  "name": "pixel-buddies",
+  "uuid": "6f1c2a9e-3b7d-4c58-9e21-8a4d5b7c0f13",
+  "creator": {
+    "version": "3.8.8"
+  },
+  "type": "2d",
+  "version": "1.0.0",
+  "description": "像素搭子（Pixel Buddies）- 轻度像素拼图小游戏，目标平台：微信小游戏、抖音小游戏"
+}
