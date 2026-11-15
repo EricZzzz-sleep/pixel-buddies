@@ -43,6 +43,24 @@ export class SettingsPage extends BasePage {
                 },
             }, W / 2 - 100, ry);
             this.toggles.push({ key: r.key, btn });
+            if (r.key === 'music') {
+                // 菜单歌单：手动切到下一首
+                button(box, {
+                    w: 120,
+                    h: 66,
+                    text: '换一首',
+                    fontSize: Theme.font.small,
+                    style: 'sky',
+                    onClick: () => {
+                        if (!gm.settings.music) {
+                            this.sm.toast('先打开背景音乐');
+                            return;
+                        }
+                        gm.audio.nextInPlaylist();
+                        this.sm.toast('已切换到下一首');
+                    },
+                }, W / 2 - 245, ry);
+            }
         });
         y -= boxH + 28;
 
