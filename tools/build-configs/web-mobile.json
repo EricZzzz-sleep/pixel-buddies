@@ -1,0 +1,15 @@
+{
+  "debug": true,
+  "startScene": "4c1f8e3a-7b2d-4e6f-9a1c-2d3e4f5a6b7c",
+  "scenes": [
+    {
+      "url": "db://assets/scenes/Main.scene",
+      "uuid": "4c1f8e3a-7b2d-4e6f-9a1c-2d3e4f5a6b7c"
+    }
+  ],
+  "buildPath": "project://build",
+  "md5Cache": false,
+  "sourceMaps": false,
+  "platform": "web-mobile",
+  "outputName": "web-mobile"
+}

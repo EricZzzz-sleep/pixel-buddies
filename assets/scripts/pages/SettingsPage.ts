@@ -1,4 +1,4 @@
-import { Label } from 'cc';
+import { Label, UITransform } from 'cc';
 import { P } from '../art/Palette';
 import { RELEASE } from '../config/PlatformConfig';
 import { Theme } from '../ui/Theme';
@@ -84,7 +84,8 @@ export class SettingsPage extends BasePage {
         const about = panel(this.root, W, aboutH, { fill: P.cream2, border: P.cream3, step: Theme.px, shadow: undefined }, 0, y - aboutH / 2);
         label(about, '关于《像素搭子》', Theme.font.body, { bold: true, align: 'left' }).node.setPosition(-W / 2 + 28, aboutH / 2 - 40);
         this.infoLabel = label(about, '', Theme.font.tiny, { color: P.ink2, width: W - 56, wrap: true, align: 'left', lineHeight: 1.55 });
-        this.infoLabel.node.setPosition(-W / 2 + 28, aboutH / 2 - 70 - (aboutH - 110) / 2);
+        this.infoLabel.node.getComponent(UITransform)!.setAnchorPoint(0, 1);
+        this.infoLabel.node.setPosition(-W / 2 + 28, aboutH / 2 - 72);
     }
 
     onEnter(): void {

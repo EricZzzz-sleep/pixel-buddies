@@ -67,15 +67,19 @@ export class ResultPage extends BasePage {
         const buttonsTop = btnY0 + 46 + shareH;
         const extraH = compare ? 186 : daily ? 166 : 0;
         const avail = L.contentTop - 20 - buttonsTop;
-        const artSize = Math.max(120, Math.min(300, avail - (150 + 254 + extraH + 70)));
+        const artSize = Math.max(120, Math.min(340, avail - (150 + 254 + extraH + 70)));
+        // 高屏：内容整体下移，使其在标题与按钮之间居中
+        const blockH = artSize + 76 + 84 + 230 + extraH;
+        const leftover = avail - 30 - blockH;
+        const shift = Math.max(0, leftover * 0.45);
 
         // 作品
-        const artY = L.contentTop - 30 - artSize / 2;
+        const artY = L.contentTop - 30 - shift - artSize / 2;
         const frame = artFrame(c, gm.textures.art(art.id), artSize, 0, artY, art.tint);
         frame.setScale(0.6, 0.6, 1);
         tween(frame).to(0.35, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' }).start();
         if (rec.newlyCollected) {
-            const badge = panel(c, 190, 52, { fill: P.mint2, border: P.ink, step: Theme.px, shadow: P.mint3 }, artSize / 2 + 10, artY + artSize / 2 + 4);
+            const badge = panel(c, 190, 52, { fill: P.mint2, border: P.ink, step: Theme.px, shadow: P.mint3 }, artSize / 2 - 10, artY + artSize / 2 - 26);
             label(badge, '新作品收藏', Theme.font.tiny, { bold: true });
             badge.angle = -8;
             popIn(badge, 0.5);

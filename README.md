@@ -7,6 +7,12 @@
 
 ![作品总览](art-preview/_contact_sheet.png)
 
+| 首页 | 游戏（6×6） | 每日挑战结算 | 好友挑战对比 |
+|---|---|---|---|
+| ![](docs/screenshots/01_home.png) | ![](docs/screenshots/03_game_6x6.png) | ![](docs/screenshots/04_result_daily.png) | ![](docs/screenshots/08_challenge_compare.png) |
+
+（以上为 Cocos Creator 3.8.8 web-mobile 构建在浏览器中的实际运行截图）
+
 ---
 
 ## 1. 当前状态（请先读）
@@ -18,11 +24,12 @@
 | 微信 API 使用 | 编译期对照微信官方 `minigame-api-typings` 校验通过（拼错接口名会编译失败） |
 | 抖音 API 使用 | 依据抖音开放平台小游戏文档（2026-11 核对）实现，有模拟测试；**无官方 TS 类型可做编译校验** |
 | 12 张原创像素图 + 图标 + 音效 | 已完成，全部由程序生成 |
-| 在 Cocos Creator 编辑器中打开 / 预览 / 构建 | **未验证**：开发机上没有安装 Cocos Creator，场景文件是参照官方 3.8 测试工程手写的 |
-| 微信/抖音开发者工具、真机 | **未验证**：需要你的开发者账号与 AppID |
+| Cocos Creator 3.8.8 命令行构建（web-mobile / 微信 / 抖音） | ✅ 三个平台都构建成功；release 包约 2.2MB（低于 4MB 主包上限） |
+| Web 构建实际运行 | ✅ 已在浏览器中玩通：经典 4×4 / 6×6、每日挑战、好友挑战完整闭环、暂停/后台、存档刷新保留，8 个页面都截图检查过 |
+| 微信/抖音开发者工具、真机 | **未验证**：本机没有两个开发者工具，也需要你的 AppID |
 | 平台审核 / 发布 | 未提交，未发布 |
 
-首次在编辑器里打开时可能需要按第 3 节做一两处确认（例如设置启动场景）。如果编辑器报场景错误，第 3.3 节有兜底方法。
+截图见 `docs/screenshots/`。命令行构建配置在 `tools/build-configs/`（第 4 节）。
 
 ---
 
@@ -103,7 +110,15 @@ cd tools && npm run audio
    - AppID：填你的微信小游戏 AppID
    - 建议勾选：MD5 缓存；纹理压缩可以不开（作品都是运行时生成的小纹理）
 4. 点击 **构建**，完成后点 **运行**，或用微信开发者工具打开 `build/wechatgame`。
-5. 包体：所有图片在运行时生成，只有音频约 280KB。建议在 **项目设置 → 功能裁剪** 里关闭 3D、物理、粒子、骨骼动画、地形、视频、WebView 等用不到的模块，进一步减小引擎体积。
+5. 包体：项目已在 `settings/v2/packages/engine.json` 中做了功能裁剪，只保留 2D、UI、Graphics、Mask、音频、Tween。release 构建实测约 2.2MB；如果不裁剪（引擎默认全模块加 debug），约 8.9MB，会超过主包上限。
+
+也可以用命令行构建（Cocos CLI 退出码 36 表示构建成功）：
+
+```bash
+/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/MacOS/CocosCreator --project "$(pwd)" --build "configPath=$(pwd)/tools/build-configs/wechatgame.release.json"
+```
+
+`tools/build-configs/` 中有 web-mobile、wechatgame、bytedance-mini-game 三个平台的 debug 和 release 配置。AppID 是占位值，请先换成你的。
 
 **AppID 位置**：以构建面板为准。`assets/scripts/config/PlatformConfig.ts` 中的 `WECHAT_CONFIG.appId` 只是标识占位，不参与鉴权。
 

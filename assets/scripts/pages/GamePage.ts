@@ -233,6 +233,7 @@ export class GamePage extends BasePage {
         if (!this.pm || this.pm.finished || this.paused) return;
         this.paused = true;
         this.pauseTimer(true);
+        this.refreshHud(true);
         this.board.setEnabled(false);
         const w = Math.min(this.L.w - 80, 560);
         const h = 560;

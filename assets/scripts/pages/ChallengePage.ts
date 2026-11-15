@@ -63,10 +63,10 @@ export class ChallengePage extends BasePage {
         y -= createH + 24;
 
         // ---- 接受挑战
-        const acceptH = 190;
+        const acceptH = 220;
         const accept = panel(this.root, W, acceptH, { fill: P.sky, border: P.ink, shadow: P.blue2, step: Theme.px, shadowDepth: 2 }, 0, y - acceptH / 2);
         label(accept, '收到挑战码？', Theme.font.h2, { bold: true, align: 'left' }).node.setPosition(-W / 2 + 28, acceptH / 2 - 44);
-        label(accept, '好友从分享卡片进入会自动打开挑战', Theme.font.tiny, { color: P.blue3, align: 'left' }).node.setPosition(-W / 2 + 28, acceptH / 2 - 84);
+        label(accept, '好友从分享卡片进入会自动打开挑战', Theme.font.tiny, { color: P.blue3, align: 'left' }).node.setPosition(-W / 2 + 28, acceptH / 2 - 80);
         button(accept, {
             w: W - 56,
             h: 80,
@@ -74,7 +74,7 @@ export class ChallengePage extends BasePage {
             style: 'white',
             icon: gm.textures.icon('paste', P.ink, P.white),
             onClick: () => this.pasteCode(),
-        }, 0, -acceptH / 2 + 56);
+        }, 0, -acceptH / 2 + 54);
         y -= acceptH + 24;
 
         // ---- 最近挑战

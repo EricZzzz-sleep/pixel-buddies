@@ -47,7 +47,14 @@ export class HomePage extends BasePage {
 
         // ---------- Logo
         const top = L.contentTop;
-        const logoY = top - 70;
+        // 纵向自适应：先按紧凑布局估算“开始按钮”与底部入口之间的空白，多出来的空间按比例分给各段间距
+        const tileH = 150;
+        const bottom = -L.h / 2 + L.safeBottom + 24;
+        const cardH = 300;
+        const compactStartBottom = top - 70 - 120 - cardH - 100 - 64;
+        const free = compactStartBottom - (bottom + tileH + 6);
+        const extra = Math.max(0, free - 220);
+        const logoY = top - 70 - extra * 0.12;
         const logo = makeNode('Logo', this.root, W, 120, 0, logoY);
         const shadow = label(logo, '像素搭子', Theme.font.hero, { bold: true, color: P.rose2, outline: { color: P.rose2, width: 6 } });
         shadow.node.setPosition(5, -6);
@@ -60,8 +67,7 @@ export class HomePage extends BasePage {
         this.animNodes.push(deco1.node, deco2.node);
 
         // ---------- 每日挑战卡片
-        const cardH = 300;
-        const cardY = logoY - 120 - cardH / 2;
+        const cardY = logoY - 120 - extra * 0.18 - cardH / 2;
         const card = panel(this.root, W, cardH, { fill: P.white, border: P.ink, shadow: P.ink, step: Theme.px, shadowDepth: 2 }, 0, cardY);
         const tag = panel(card, 170, 52, { fill: P.yellow, border: P.ink, step: Theme.px, shadow: undefined }, -W / 2 + 110, cardH / 2 - 2);
         sprite(tag, gm.textures.icon('calendar', P.ink, P.rose), 26, 24, -52, 0);
@@ -83,7 +89,7 @@ export class HomePage extends BasePage {
         this.dailyBtn = button(card, { w: 250, h: 80, text: '去挑战', style: 'butter', fontSize: Theme.font.body, onClick: () => Flow.daily() }, tx + 125, -94);
 
         // ---------- 开始拼图
-        const startY = cardY - cardH / 2 - 100;
+        const startY = cardY - cardH / 2 - 100 - extra * 0.18;
         this.startBtn = button(this.root, {
             w: W,
             h: 128,
@@ -96,8 +102,6 @@ export class HomePage extends BasePage {
         }, 0, startY);
 
         // ---------- 底部功能入口
-        const bottom = -L.h / 2 + L.safeBottom + 24;
-        const tileH = 150;
         const gridY = bottom + tileH / 2 + 6;
         const entries: Array<{ text: string; icon: string; style: 'mint' | 'sky' | 'lilac' | 'white'; color: number; go: () => void }> = [
             { text: '经典拼图', icon: 'puzzle', style: 'mint', color: P.leaf3, go: () => this.sm.go('classic') },
@@ -112,7 +116,7 @@ export class HomePage extends BasePage {
         });
 
         // ---------- 收藏进度条（开始按钮与入口之间）
-        const midY = (startY - 70 + gridY + tileH / 2) / 2;
+        const midY = startY - 64 - 40 - 46 - extra * 0.16;
         const prog = panel(this.root, W, 92, { fill: P.cream2, border: P.cream3, step: Theme.px, shadow: undefined }, 0, midY);
         sprite(prog, gm.textures.icon('book', P.purple, P.white), 34, 26, -W / 2 + 40, 12);
         this.progressLabel = label(prog, '', Theme.font.small, { bold: true, align: 'left', color: P.ink2 });
