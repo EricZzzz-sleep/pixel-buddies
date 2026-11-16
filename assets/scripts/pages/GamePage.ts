@@ -6,7 +6,7 @@ import { PlaySession, ResultPayload } from '../core/GameManager';
 import { PuzzleBoard } from '../puzzle/PuzzleBoard';
 import { BEGINNER_GRID } from '../config/GameConfig';
 import { PuzzleManager, SwapOutcome } from '../puzzle/PuzzleManager';
-import { computeStars } from '../puzzle/PuzzleScoring';
+import { computeStars, movesHudText } from '../puzzle/PuzzleScoring';
 import { Effects } from '../ui/Effects';
 import { hex, Theme } from '../ui/Theme';
 import { Ticker } from '../ui/Ticker';
@@ -22,7 +22,7 @@ const MODE_TAG: Record<PlaySession['mode'], string> = {
 };
 
 /**
- * 游戏进行页：HUD（时间/步数与三星步数上限/三星剩余时间/进度）+ 拼图板 + 工具栏（原图/提示/撤销）。
+ * 游戏进行页：HUD（时间/步数与当前星级步数上限/三星剩余时间/进度）+ 拼图板 + 工具栏（原图/提示/撤销）。
  * 计时从第一次触碰有效方块开始；暂停、进入后台都会冻结计时。
  */
 export class GamePage extends BasePage {
@@ -374,9 +374,8 @@ export class GamePage extends BasePage {
         const left = s.threeStarSeconds * 1000 - ms;
         this.goalLabel.string = left > 0 ? `三星 ${formatDuration(left)}` : `${s.stars} 星进行中`;
         if (!full) return;
-        // 已用步数 / 三星步数上限：超过后变红，让玩家知道乱试的代价
-        this.movesLabel.string = `${pm.moves}/${s.threeStarMoves} 步`;
-        this.movesLabel.color = hex(pm.moves > s.threeStarMoves ? P.red2 : Theme.ink);
+        // 已用步数 / 当前星级的步数上限（三星 → 二星 → 不限），让玩家知道乱试的代价
+        this.movesLabel.string = movesHudText(pm.moves, s);
         this.hintBtn.setText(`提示 ×${pm.hintsLeft}`);
         this.undoBtn.setEnabled(pm.canUndo);
         const done = pm.correctCount;
