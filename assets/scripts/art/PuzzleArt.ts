@@ -1,6 +1,7 @@
 import { ART_SIZE } from '../config/GameConfig';
 import { P } from './Palette';
 import { PixelCanvas } from './PixelCanvas';
+import { ZODIAC_PAINTERS } from './ZodiacArt';
 
 /**
  * 12 张原创像素作品的绘制程序（60×60）。
@@ -525,6 +526,7 @@ export const PAINTERS: Record<string, Painter> = {
     flower_garden: flowerGarden,
     starry_night: starryNight,
     beach_sunset: beachSunset,
+    ...ZODIAC_PAINTERS,
 };
 
 /** 渲染指定作品为 60×60 像素画；未知 ID 返回奶油色占位图（不会抛错） */

@@ -5,10 +5,11 @@ import { ART_LIST, ArtCategory, getArt } from '../art/ArtCatalog';
  * - 可爱动物：橘猫、柴犬、白猫、兔子（分类 animal）
  * - 甜品派对：草莓蛋糕、珍珠奶茶、马卡龙塔、三球冰淇淋（分类 food）
  * - 温馨日常：卧室、小花园、星空小屋、海边日落（分类 life + nature）
+ * - 十二生肖：鼠牛虎兔龙蛇马羊猴鸡狗猪（分类 zodiac，ZodiacArt.ts）
  * 每张图恰好属于一个系列；tests/collection.test.ts 会检查这一点。
  */
 
-export type SeriesId = 'animals' | 'sweets' | 'daily';
+export type SeriesId = 'animals' | 'sweets' | 'daily' | 'zodiac';
 
 export interface SeriesReward {
     /** 收藏徽章 */
@@ -68,6 +69,17 @@ export const SERIES_LIST: SeriesInfo[] = [
         tint: 'lilac',
         reward: { badge: '小确幸徽章', frame: '星屋头像框', background: '晚安夜空背景', color: 0x9f88da },
         categories: ['life', 'nature'],
+    },
+    {
+        id: 'zodiac',
+        no: 4,
+        name: '十二生肖',
+        desc: '鼠牛虎兔龙蛇，马羊猴鸡狗猪',
+        cover: 'zodiac_rat',
+        items: ['zodiac_rat', 'zodiac_ox', 'zodiac_tiger', 'zodiac_rabbit', 'zodiac_dragon', 'zodiac_snake', 'zodiac_horse', 'zodiac_goat', 'zodiac_monkey', 'zodiac_rooster', 'zodiac_dog', 'zodiac_pig'],
+        tint: 'pink',
+        reward: { badge: '福星徽章', frame: '灯笼头像框', background: '新春窗花背景', color: 0xd65a63 },
+        categories: ['zodiac'],
     },
 ];
 

@@ -35,7 +35,7 @@ test('音乐目录：每首曲目在所属分包里都有 mp3 与 .meta，分包
     }
 });
 
-test('主题曲：12 张内置作品每张都有自己的主题曲，放在所属系列的分包里', () => {
+test('主题曲：每张内置作品都有自己的主题曲，放在所属系列的分包里', () => {
     for (const art of ART_LIST) {
         const id = themeOf(art.id);
         assert.ok(id, `${art.id} 没有主题曲`);
