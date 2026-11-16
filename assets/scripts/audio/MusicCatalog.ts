@@ -5,7 +5,7 @@ import { seriesOfItem, SeriesId } from '../collection/SeriesCatalog';
  *
  * 全部曲目都放在独立的 Asset Bundle 里（小游戏上设为“小游戏分包”，不占 4MB 主包）：
  * - `music`：菜单歌单 5 首（午后像素、拼图时光、甜品派对、星空小屋由 tools/gen-music.py 合成；Pink Haze 是作者录音）；
- * - `music_animals` / `music_sweets` / `music_daily` / `music_zodiac`：每张内置作品各自的主题曲（tools/gen-themes.py 合成，约 2:40），
+ * - `music_animals` / `music_sweets` / `music_daily` / `music_zodiac` / `music_stars`：每张内置作品各自的主题曲（tools/gen-themes.py 合成，约 2:40），
  *   按系列拆成分包，玩到哪个系列才下载哪个。
  *
  * 选曲规则：
@@ -33,6 +33,7 @@ export const THEME_BUNDLES: Record<SeriesId, string> = {
     sweets: 'music_sweets',
     daily: 'music_daily',
     zodiac: 'music_zodiac',
+    stars: 'music_stars',
 };
 
 const CORE: BgmInfo[] = [
@@ -57,7 +58,7 @@ export const THEME_TITLES: Record<string, string> = {
     flower_garden: '蝴蝶来访',
     starry_night: '第一百颗星',
     beach_sunset: '落日口袋',
-    // 十二生肖（五声音阶）
+    // 十二生肖（tools/gen-songs.py：手写五声旋律 + 中国乐器）
     zodiac_rat: '数铜钱',
     zodiac_ox: '田埂慢歌',
     zodiac_tiger: '竹林巡山',
@@ -70,6 +71,19 @@ export const THEME_TITLES: Record<string, string> = {
     zodiac_rooster: '第一声早安',
     zodiac_dog: '红围巾',
     zodiac_pig: '元宝滚滚',
+    // 十二星座（tools/gen-songs.py：手写旋律 + 西洋原声乐器）
+    stars_aries: '冲呀小羊',
+    stars_taurus: '慢慢品尝',
+    stars_gemini: '镜子里的我',
+    stars_cancer: '沙滩上的家',
+    stars_leo: '小小国王',
+    stars_virgo: '麦田里的诗',
+    stars_libra: '平衡木',
+    stars_scorpio: '夜色秘密',
+    stars_sagittarius: '一支箭',
+    stars_capricorn: '爬山的星星',
+    stars_aquarius: '倒一杯星光',
+    stars_pisces: '两条小鱼',
 };
 
 const THEMES: BgmInfo[] = Object.keys(THEME_TITLES).map((artId) => {
@@ -118,6 +132,7 @@ export const SERIES_BGM: Record<SeriesId, BgmId> = {
     sweets: 'sweets',
     daily: 'cabin',
     zodiac: 'theme_zodiac_dragon',
+    stars: 'theme_stars_aquarius',
 };
 
 export const FOCUS_BGM: BgmId = 'puzzle';

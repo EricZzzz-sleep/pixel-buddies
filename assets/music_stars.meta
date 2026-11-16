@@ -1,0 +1,14 @@
+{
+  "ver": "1.2.0",
+  "importer": "directory",
+  "imported": true,
+  "uuid": "c62dc476-bce0-461d-81f0-abf242fe8420",
+  "files": [],
+  "subMetas": {},
+  "userData": {
+    "isBundle": true,
+    "bundleConfigID": "pb_music_remote_cfg",
+    "bundleName": "music_stars",
+    "priority": 1
+  }
+}

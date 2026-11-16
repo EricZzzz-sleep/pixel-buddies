@@ -15,10 +15,11 @@ const fresh = (t = 1000) => {
     return { storage, save, col: new CollectionManager(save, () => t) };
 };
 
-test('系列数据：24 张作品恰好分入 4 个系列，分类相符，无重复无遗漏', () => {
+test('系列数据：36 张作品恰好分入 5 个系列，分类相符，无重复无遗漏', () => {
     assert.deepEqual(validateSeries(), []);
     assert.equal(SERIES_LIST.reduce((n, s) => n + s.items.length, 0), ART_LIST.length);
-    assert.deepEqual(SERIES_LIST.map((s) => s.items.length), [4, 4, 4, 12]);
+    assert.deepEqual(SERIES_LIST.map((s) => s.items.length), [4, 4, 4, 12, 12]);
+    assert.equal(seriesOfItem('stars_leo')!.id, 'stars');
     assert.equal(seriesOfItem('zodiac_dragon')!.id, 'zodiac');
     assert.equal(seriesOfItem('shiba')!.id, 'animals');
     assert.equal(seriesOfItem('macarons')!.id, 'sweets');
@@ -79,7 +80,7 @@ test('集齐系列自动获得奖励，只发放一次；反复刷图没有额�
     const col2 = new CollectionManager(new SaveManager(storage, () => 9000), () => 9000);
     assert.equal(col2.seriesProgress('animals').done, true);
     assert.deepEqual(col2.seriesProgress('animals').reward, { at: 5000, seen: true });
-    assert.deepEqual(col2.overall(), { collected: 4, total: 24, ratio: 4 / 24, seriesDone: 1, seriesTotal: 4 });
+    assert.deepEqual(col2.overall(), { collected: 4, total: 36, ratio: 4 / 36, seriesDone: 1, seriesTotal: 5 });
     assert.equal(col2.earnedRewards()[0].id, 'animals');
 });
 

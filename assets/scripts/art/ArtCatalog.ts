@@ -3,7 +3,7 @@
  * 每张图都是原创的程序绘制像素画（见 PuzzleArt.ts），附带一句小故事。
  */
 
-export type ArtCategory = 'animal' | 'food' | 'life' | 'nature' | 'zodiac';
+export type ArtCategory = 'animal' | 'food' | 'life' | 'nature' | 'zodiac' | 'stars';
 
 export interface ArtInfo {
     id: string;
@@ -23,9 +23,10 @@ export const CATEGORY_LABEL: Record<ArtCategory, string> = {
     life: '生活',
     nature: '自然',
     zodiac: '生肖',
+    stars: '星座',
 };
 
-export const CATEGORY_ORDER: ArtCategory[] = ['animal', 'food', 'life', 'nature', 'zodiac'];
+export const CATEGORY_ORDER: ArtCategory[] = ['animal', 'food', 'life', 'nature', 'zodiac', 'stars'];
 
 export const ART_LIST: ArtInfo[] = [
     { id: 'cat_orange', name: '橘猫午后', category: 'animal', story: '橘猫把午后的阳光当成了自己的被子。', unlockStars: 0, tint: 'peach' },
@@ -53,6 +54,19 @@ export const ART_LIST: ArtInfo[] = [
     { id: 'zodiac_rooster', name: '晨光小鸡', category: 'zodiac', story: '第一缕阳光，由它负责叫醒。', unlockStars: 36, tint: 'peach' },
     { id: 'zodiac_dog', name: '围巾小狗', category: 'zodiac', story: '红围巾是奶奶织的，暖到尾巴尖。', unlockStars: 40, tint: 'sky' },
     { id: 'zodiac_pig', name: '元宝小猪', category: 'zodiac', story: '吃饱睡好，元宝自己滚进来。', unlockStars: 44, tint: 'pink' },
+    // 系列 05 十二星座
+    { id: 'stars_aries', name: '冲呀小羊', category: 'stars', story: '白羊座的小羊，第一个冲向春天。', unlockStars: 2, tint: 'lilac' },
+    { id: 'stars_taurus', name: '慢慢品尝', category: 'stars', story: '金牛座说：好吃的蛋糕要一口一口吃。', unlockStars: 6, tint: 'lilac' },
+    { id: 'stars_gemini', name: '镜子里的我', category: 'stars', story: '双子座的两颗小星，连笑都是同一个弧度。', unlockStars: 10, tint: 'sky' },
+    { id: 'stars_cancer', name: '沙滩上的家', category: 'stars', story: '巨蟹座的小螃蟹，把月光当成门口的灯。', unlockStars: 14, tint: 'sky' },
+    { id: 'stars_leo', name: '小小国王', category: 'stars', story: '狮子座戴着小王冠，其实最想要一个抱抱。', unlockStars: 18, tint: 'butter' },
+    { id: 'stars_virgo', name: '麦田里的诗', category: 'stars', story: '处女座的女孩，把每一株麦穗都数得整整齐齐。', unlockStars: 22, tint: 'butter' },
+    { id: 'stars_libra', name: '平衡木', category: 'stars', story: '天秤座的秤：一边放爱心，一边放星星。', unlockStars: 26, tint: 'lilac' },
+    { id: 'stars_scorpio', name: '夜色秘密', category: 'stars', story: '天蝎座的尾巴尖，藏着一颗会发光的星。', unlockStars: 30, tint: 'lilac' },
+    { id: 'stars_sagittarius', name: '一支箭', category: 'stars', story: '射手座射出的箭，带着爱心飞向远方。', unlockStars: 34, tint: 'mint' },
+    { id: 'stars_capricorn', name: '爬山的星星', category: 'stars', story: '摩羯座的海山羊，一步一步爬上星空。', unlockStars: 38, tint: 'sky' },
+    { id: 'stars_aquarius', name: '倒一杯星光', category: 'stars', story: '水瓶座把星光倒进海里，海就亮了。', unlockStars: 42, tint: 'sky' },
+    { id: 'stars_pisces', name: '两条小鱼', category: 'stars', story: '双鱼座的两条鱼，用一根丝带系在一起。', unlockStars: 46, tint: 'pink' },
 ];
 
 const BY_ID: Record<string, ArtInfo> = {};
