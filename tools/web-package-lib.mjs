@@ -73,7 +73,7 @@ export function renderVercelJson(rules) {
       {
         $schema: 'https://openapi.vercel.sh/vercel.json',
         cleanUrls: false,
-        trailingSlash: false,
+        // 不要设 trailingSlash:false —— 它会把 /play/ 跳回 /play，和下面的跳转形成死循环
         redirects: [{ source: '/play', destination: '/play/', permanent: false }],
         rewrites: [{ source: '/api/(.*)', destination: '/api/unavailable' }],
         headers: rules.map((r) => ({ source: esc(r.path), headers: r.set.map(([key, value]) => ({ key, value })) })),
@@ -90,3 +90,6 @@ export const VERCEL_API_STUB = `export default function handler(req, res) {
   res.status(503).json({ error: 'backend_not_configured', message: 'Vercel 部署没有接入统计与反馈后端' });
 }
 `;
+
+/** Vercel 上传时排除的文件：Cloudflare 专用的 _headers，以及 vercel link 生成的本地凭证文件 */
+export const VERCEL_IGNORE = '_headers\n.env*\n.gitignore\n';
