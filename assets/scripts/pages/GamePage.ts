@@ -210,7 +210,7 @@ export class GamePage extends BasePage {
         const gm = this.gm;
         gm.audio.play('swap', 0.6);
         if (o.newlyCorrectCells.length) {
-            // 放对单块不播放音效，只在整张拼完时播放完成音效（finish 里）
+            this.scheduleCall(0.14, () => gm.audio.play('correct', 0.7));
             gm.vibrate();
             for (const c of o.newlyCorrectCells) {
                 const p = this.board.celebrateCell(c);
