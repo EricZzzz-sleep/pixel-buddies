@@ -64,6 +64,22 @@ cd tools && npx tsx smoke-api.ts https://你的域名
 
 建议在 Cloudflare 控制台给 `/api/*` 加一条 WAF 速率限制规则（例如每 IP 每分钟 60 次），防止被刷；函数本身只做大小/字段/白名单校验。
 
+## 2b. 部署到 Vercel（可选）
+
+同样是“本机构建 → 上传 dist/”：Vercel 的服务器上没有 Cocos Creator，**不能**让 Vercel 从 GitHub 自动构建这个项目（Git 自动部署会失败或只得到空站点）。
+
+```bash
+cd tools && npm run web:vercel          # 第一次会弹出浏览器登录 Vercel
+# 已经构建过、只想重新上传：SKIP_BUILD=1 npm run web:vercel
+# 指定团队/项目名：VERCEL_SCOPE=eric-zzzz VERCEL_PROJECT=pixel-buddies npm run web:vercel
+```
+
+它会依次：`npm run verify` → Cocos 构建 → 打包 `dist/` → 写入 `dist/vercel.json`（与 `_headers` 相同的缓存/安全头）和 `/api` 占位函数 → `vercel link` 到已有项目 → `vercel deploy --prod`。
+
+与 Cloudflare 版的区别：
+- Vercel 上没有 D1 数据库，**统计与意见反馈不可用**：`*.vercel.app` 域名下游戏不会发请求，反馈页显示“反馈通道还没开通”并提供“复制反馈”；自定义域名下 `/api/*` 统一返回 503。
+- 如果 Vercel 项目连着 GitHub 仓库，建议在 Project Settings → Git 里断开，或把 Ignored Build Step 设为 `exit 0`，避免每次推送都产生失败的部署。
+
 ### 缓存与路由（已验证）
 - `/play/assets/*`、`/play/cocos-js/*`、`/play/src/*` 和根下带哈希的 js/css/png：`immutable`，一年；`src/effect.bin`、`/play/`、`/play/index.html`：每次校验。
 - 404 返回 `404.html`（带回首页/直接开玩按钮）；没有 SPA 兜底，错误地址不会被当成游戏。

@@ -13,6 +13,7 @@
     "web:build": "bash build-web.sh",
     "web:package": "node package-web.mjs",
     "web:deploy": "bash deploy-web.sh",
+    "web:vercel": "bash deploy-vercel.sh",
     "web:all": "npm run web:build && npm run web:package"
   },
   "devDependencies": {

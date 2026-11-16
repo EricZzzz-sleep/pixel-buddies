@@ -69,5 +69,7 @@ export function resolveApiBase(kind: string, hostname: string, miniApiBase: stri
     const h = (hostname || '').toLowerCase();
     if (!h || h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h.endsWith('.local') || h.endsWith('.localhost')) return '';
     if (/^(10|192\.168)\./.test(h) || /^172\.(1[6-9]|2\d|3[01])\./.test(h)) return '';
+    // Vercel 托管时没有 Cloudflare D1 后端：不发统计，反馈页如实提示“未开通”并提供“复制反馈”
+    if (h.endsWith('.vercel.app')) return '';
     return '/api';
 }

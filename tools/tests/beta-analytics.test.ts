@@ -189,6 +189,8 @@ test('接口地址：Web 在线部署用同源 /api，本地与局域网不连�
     assert.equal(resolveApiBase('web', 'pixel-buddies.pages.dev'), '/api');
     assert.equal(resolveApiBase('web', 'play.example.com'), '/api');
     assert.equal(resolveApiBase('web', 'localhost'), '');
+    assert.equal(resolveApiBase('web', 'pixel-buddies.vercel.app'), '', 'Vercel 没有后端，不发请求');
+    assert.equal(resolveApiBase('web', 'pixel-buddies-git-main-eric-zzzz.vercel.app'), '');
     assert.equal(resolveApiBase('web', '127.0.0.1'), '');
     assert.equal(resolveApiBase('web', '192.168.1.8'), '');
     assert.equal(resolveApiBase('web', ''), '');

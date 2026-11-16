@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 // @ts-expect-error .mjs 没有类型声明
-import { buildHeaders, HASHED, isForbidden, IMMUTABLE, MAX_RULES, renderHeaders } from '../web-package-lib.mjs';
+import { buildHeaders, HASHED, isForbidden, IMMUTABLE, MAX_RULES, renderHeaders, renderVercelJson } from '../web-package-lib.mjs';
 
 test('哈希识别：Cocos md5Cache 文件名算哈希，其余不算', () => {
     assert.ok(HASHED.test('index.c871a.js'));
@@ -72,4 +72,30 @@ test('打包脚本：用样例构建生成 dist，排除隐藏文件，写出 _h
     // 引用外部地址也必须失败
     writeFileSync(join(build, 'index.html'), '<html><script src="https://cdn.example.com/x.js"></script></html>');
     assert.throws(() => execFileSync(process.execPath, [script, build, dist], { stdio: 'pipe' }));
+});
+
+test('Vercel：缓存规则转成 vercel.json，顺序不变，/api 改写到 503 占位函数', () => {
+    const files = ['index.html', 'index.c871a.js', 'src/effect.bin', 'src/settings.dd63d.json', 'assets/main/config.d31be.json'];
+    const cfg = JSON.parse(renderVercelJson(buildHeaders(files)));
+    const sources = cfg.headers.map((h: { source: string }) => h.source);
+    assert.equal(sources[0], '/(.*)');
+    assert.ok(sources.indexOf('/play/src/(.*)') < sources.indexOf('/play/src/effect.bin'), '未哈希例外排在目录规则后面，才能覆盖 immutable');
+    const effect = cfg.headers.find((h: { source: string }) => h.source === '/play/src/effect.bin');
+    assert.match(effect.headers[0].value, /must-revalidate/);
+    assert.deepEqual(cfg.rewrites, [{ source: '/api/(.*)', destination: '/api/unavailable' }]);
+});
+
+test('Vercel：vercel-config 在 dist 上写出 vercel.json 与 /api 占位函数', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'pb-vercel-'));
+    const build = join(tmp, 'build');
+    const dist = join(tmp, 'dist');
+    mkdirSync(join(build, 'src'), { recursive: true });
+    writeFileSync(join(build, 'index.html'), '<html><script src="index.abcde.js"></script></html>');
+    writeFileSync(join(build, 'index.abcde.js'), 'x');
+    writeFileSync(join(build, 'src', 'effect.bin'), 'x');
+    execFileSync(process.execPath, [join(__dirname, '..', 'package-web.mjs'), build, dist], { stdio: 'pipe' });
+    execFileSync(process.execPath, [join(__dirname, '..', 'vercel-config.mjs'), dist], { stdio: 'pipe' });
+    const cfg = JSON.parse(readFileSync(join(dist, 'vercel.json'), 'utf8'));
+    assert.ok(cfg.headers.some((h: { source: string }) => h.source === '/play/index.abcde.js'));
+    assert.match(readFileSync(join(dist, 'api', 'unavailable.js'), 'utf8'), /503/);
 });
