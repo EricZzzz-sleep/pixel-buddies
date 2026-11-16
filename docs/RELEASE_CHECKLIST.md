@@ -41,3 +41,12 @@
 - [ ] 如需真实广告：填入广告位 ID、打开 `adsEnabled`，实测看完发奖/中途关闭/失败提示（见 ADS_SETUP.md）
 - [ ] 如需在线排行榜：自建后端并配置 `leaderboardEndpoint`、合法域名（见 leaderboard-backend.md）
 - [ ] 分享卡片（升级/成就/周挑战/名片）在微信真机验证分享图
+
+## V6 公测（Web）新增事项
+- [ ] 注册/登录 Cloudflare，`wrangler login`，创建 D1 并建表、填 `wrangler.toml`（见 PUBLIC_BETA.md 第 2 节）
+- [ ] 替换隐私政策里的【开发者名称】【联系邮箱】占位符（`assets/scripts/config/PolicyText.ts`）——公开前必须做
+- [ ] `cd tools && npm run web:deploy`，然后 `npx tsx smoke-api.ts https://你的域名` 冒烟
+- [ ] 在 Cloudflare 给 `/api/*` 配速率限制规则
+- [ ] 真机 iOS Safari / Android Chrome 打开：加载页、双指缩放被禁用、切后台音乐暂停、刷新后进度还在、反馈输入框弹键盘、旋转屏幕
+- [ ] 用 768×1024 与 1440×900 的真实浏览器窗口检查首页/游戏/设置/反馈页布局
+- [ ] 小游戏端如要统计/反馈：配置 `RELEASE.miniApiBase` 并加入平台合法域名

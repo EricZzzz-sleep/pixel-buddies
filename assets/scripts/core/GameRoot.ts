@@ -4,7 +4,6 @@ import { P } from '../art/Palette';
 import { AudioManager } from '../audio/AudioManager';
 import { MusicContext, pickBgm } from '../audio/MusicCatalog';
 import { CHALLENGE } from '../config/GameConfig';
-import { RELEASE } from '../config/PlatformConfig';
 import { ChallengePage } from '../pages/ChallengePage';
 import { ClassicPage } from '../pages/ClassicPage';
 import { CollectionPage } from '../pages/CollectionPage';
@@ -21,6 +20,8 @@ import { RewardPage } from '../pages/RewardPage';
 import { GoalsPage } from '../pages/GoalsPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { HistoryPage } from '../pages/HistoryPage';
+import { FeedbackPage } from '../pages/FeedbackPage';
+import { shouldRelayout } from './RelayoutPolicy';
 import { createPlatformAdapter } from '../platform/PlatformFactory';
 import { PlatformAdapter } from '../platform/PlatformAdapter';
 import { hex, Theme } from '../ui/Theme';
@@ -70,12 +71,14 @@ export class GameRoot extends Component {
         audio.setEnabled(this.gm.settings.sfx, this.gm.settings.music);
         audio.load();
         this.gm.audio = audio;
+        audio.onLoadFailed = (kind, id) => this.gm.analytics.trackOnce(`alf:${kind}:${id}`, 'asset_load_failed', { kind, id });
         UIHooks.onButtonClick = () => audio.play('click', 0.6);
         // 背景音乐跟随页面/主题切换（规则见 MusicCatalog.pickBgm）
         const musicCtx: MusicContext = {};
         this.sm.onPageEnter = (name, params) => {
             const id = pickBgm(name, params, musicCtx);
             if (id) audio.playMusic(id);
+            this.relayoutIfNeeded(name);
         };
 
         this.sm.register(new HomePage(this.sm, 'home'));
@@ -93,6 +96,7 @@ export class GameRoot extends Component {
         this.sm.register(new GoalsPage(this.sm, 'goals'));
         this.sm.register(new ProfilePage(this.sm, 'profile'));
         this.sm.register(new HistoryPage(this.sm, 'history'));
+        this.sm.register(new FeedbackPage(this.sm, 'feedback'));
 
         this.bindLifecycle(platform);
         this.gm.share.registerPassiveShare();
@@ -100,7 +104,12 @@ export class GameRoot extends Component {
 
     start(): void {
         this.sm.go('home');
-        this.gm.analytics.trackOnce('app_opened', 'app_opened', { platform: this.gm.platform.kind, version: RELEASE.version, launch: this.gm.save.data.launchCount });
+        // 同意匿名统计之前不会发出任何事件；加载耗时 = 从页面开始加载到首页出现（仅 Web 可测）
+        const perf = (globalThis as { performance?: { now(): number } }).performance;
+        this.gm.announceSession(this.gm.platform.kind === 'web' && perf ? perf.now() : undefined);
+        this.bindErrorReporting();
+        const boot = (globalThis as { __pbBoot?: { ready(): void } }).__pbBoot;
+        if (boot) boot.ready();
         // 冷启动：从分享卡片进入时 query 中带有挑战数据
         const launch = this.gm.platform.getLaunchInfo();
         this.handleQuery(launch.query);
@@ -122,6 +131,29 @@ export class GameRoot extends Component {
         }, 0.4);
     }
 
+    /** Web：窗口大小/方向明显变化后，在安全的页面切换时刷新一次以重新布局（进度已保存） */
+    private relayoutIfNeeded(page: string): void {
+        if (this.gm.platform.kind !== 'web') return;
+        const g = globalThis as { location?: { reload(): void }; sessionStorage?: Storage };
+        if (!g.location) return;
+        const vis = view.getVisibleSize();
+        let last = 0;
+        try {
+            last = Number(g.sessionStorage?.getItem('pb_relayout_at') || 0);
+        } catch {
+            /* 无痕模式下可能不可用 */
+        }
+        const L = this.gm.layout;
+        if (!shouldRelayout({ w: L.fullW, h: L.fullH }, { w: vis.width, h: vis.height }, page, last, Date.now())) return;
+        try {
+            g.sessionStorage?.setItem('pb_relayout_at', String(Date.now()));
+        } catch {
+            /* 忽略 */
+        }
+        this.gm.save.flush();
+        g.location.reload();
+    }
+
     private bindLifecycle(platform: PlatformAdapter): void {
         // 引擎在各平台统一派发前后台事件（小游戏内部对接 wx.onHide/tt.onHide）
         game.on(Game.EVENT_HIDE, this.onHide, this);
@@ -130,7 +162,25 @@ export class GameRoot extends Component {
         platform.onShow((info) => this.handleQuery(info.query));
     }
 
+    /** 未捕获的错误只记“种类 + 短信息”（网址/路径会被抹掉），每个会话最多 5 条，绝不影响游戏 */
+    private bindErrorReporting(): void {
+        const g = globalThis as { addEventListener?: (t: string, f: (e: unknown) => void) => void };
+        if (typeof g.addEventListener !== 'function') return;
+        let n = 0;
+        const report = (kind: string, msg: unknown) => {
+            if (n++ >= 5) return;
+            try {
+                this.gm.analytics.track('game_error', { kind, msg: String(msg || '').slice(0, 80) });
+            } catch {
+                /* 统计出错也不能再抛 */
+            }
+        };
+        g.addEventListener('error', (e) => report('error', (e as { message?: string }).message));
+        g.addEventListener('unhandledrejection', (e) => report('promise', ((e as { reason?: { message?: string } }).reason || {}).message || (e as { reason?: unknown }).reason));
+    }
+
     private onHide(): void {
+        this.gm.onAppHidden();
         this.gm.save.flush();
         this.gm.audio.suspend();
         this.gm.events.emit('app:hide');
@@ -138,6 +188,7 @@ export class GameRoot extends Component {
     }
 
     private onShow(): void {
+        this.gm.onAppShown();
         this.gm.audio.resume();
     }
 

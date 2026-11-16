@@ -151,8 +151,8 @@ test('统计：默认不上传；开启后只上传白名单事件，且去除�
 
 test('统计：trackOnce 去重；缓冲有上限；sanitize 截断长字符串', () => {
     const a = new Analytics(() => false);
-    assert.equal(a.trackOnce('open', 'app_opened'), true);
-    assert.equal(a.trackOnce('open', 'app_opened'), false);
+    assert.equal(a.trackOnce('open', 'game_opened'), true);
+    assert.equal(a.trackOnce('open', 'game_opened'), false);
     for (let i = 0; i < 300; i++) a.track('puzzle_started');
     assert.equal(a.recent(1000).length, 200);
     assert.equal((sanitizeProps({ s: 'x'.repeat(200) })!.s as string).length, 48);

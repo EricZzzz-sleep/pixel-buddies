@@ -1,0 +1,23 @@
+name: verify
+
+# 只做代码层面的检查：严格类型检查、微信接口兼容检查、单元测试。
+# 不构建游戏：GitHub 托管的 runner 没有 Cocos Creator 编辑器，Web 包需要在本机构建后部署（见 docs/PUBLIC_BETA.md）。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: tools/package-lock.json
+      - run: npm ci
+        working-directory: tools
+      - run: npm run verify
+        working-directory: tools

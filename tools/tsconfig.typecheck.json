@@ -25,6 +25,7 @@
   },
   "include": [
     "../assets/scripts/**/*.ts",
+    "../functions/**/*.ts",
     "./shims/*.d.ts"
   ]
 }

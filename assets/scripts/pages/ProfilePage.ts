@@ -83,7 +83,11 @@ export class ProfilePage extends BasePage {
         mk('分享我的名片', 'primary', 'share', () => this.shareProfile());
         mk('任务与成就', 'butter', 'trophy', () => this.sm.go('goals'), gm.progress.claimableCount() > 0);
         mk('挑战记录与排行', 'mint', 'users', () => this.sm.go('history'));
-        mk('设置', 'white', 'gear', () => this.sm.go('settings'));
+        // 设置 + 意见反馈并排：公测期让反馈入口离首页只有两步
+        const hw = (W - 16) / 2;
+        button(c, { w: hw, h: bh, text: '设置', style: 'white', icon: gm.textures.icon('gear', P.ink), onClick: () => this.sm.go('settings') }, -hw / 2 - 8, y - bh / 2);
+        button(c, { w: hw, h: bh, text: '意见反馈', style: 'sky', icon: gm.textures.icon('heart', P.ink), onClick: () => this.sm.go('feedback') }, hw / 2 + 8, y - bh / 2);
+        y -= bh + 16;
         if (best) label(c, `每日挑战最佳：${best}`, Theme.font.tiny, { color: Theme.textMuted, width: W }).node.setPosition(0, y - 10);
         this.list.setContentHeight(-y + 50);
         this.list.scrollToTop();

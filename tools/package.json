@@ -9,7 +9,11 @@
     "verify": "npm run typecheck && npm run check:wechat-api && npm test",
     "art": "tsx render-art.ts",
     "audio": "tsx gen-audio.ts",
-    "store-assets": "tsx render-store-assets.ts"
+    "store-assets": "tsx render-store-assets.ts",
+    "web:build": "bash build-web.sh",
+    "web:package": "node package-web.mjs",
+    "web:deploy": "bash deploy-web.sh",
+    "web:all": "npm run web:build && npm run web:package"
   },
   "devDependencies": {
     "@cocos/creator-types": "^3.8.8",

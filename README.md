@@ -21,16 +21,18 @@
 
 ---
 
+> **公测（Web）**：落地页 + 在线部署 + 匿名统计（需同意）+ 意见反馈 + Cloudflare Pages 部署流程，见 [docs/PUBLIC_BETA.md](docs/PUBLIC_BETA.md)。
+
 ## 1. 当前状态（请先读）
 
 | 项目 | 状态 |
 |---|---|
-| 核心逻辑（打乱、交换、判定、计时、星级、存档、每日、挑战码、工坊、分享卡片） | 已完成，63 项 Node 单元测试全部通过 |
+| 核心逻辑（打乱、交换、判定、计时、星级、存档、每日、挑战码、工坊、分享卡片） | 已完成，125 项 Node 单元测试全部通过（`cd tools && npm run verify`） |
 | 全部游戏脚本 | 已完成，在 `@cocos/creator-types@3.8.8`（官方引擎类型）下 **strict 模式编译零错误** |
 | 微信 API 使用 | 编译期对照微信官方 `minigame-api-typings` 校验通过（拼错接口名会编译失败） |
 | 抖音 API 使用 | 依据抖音开放平台小游戏文档（2026-11 核对）实现，有模拟测试；**无官方 TS 类型可做编译校验** |
 | 12 张原创像素图 + 图标 + 音效 | 已完成，全部由程序生成 |
-| Cocos Creator 3.8.8 命令行构建（web-mobile / 微信 / 抖音） | ✅ 三个平台都构建成功；release 包约 2.2MB（低于 4MB 主包上限） |
+| Cocos Creator 3.8.8 命令行构建（web-mobile / 微信 / 抖音） | ✅ 三个平台都构建成功；微信/抖音主包约 2.4MB（低于 4MB 上限），音乐在分包（约 14MB），整包约 16.6MB |
 | Web 构建实际运行 | ✅ 已在浏览器中玩通：经典 4×4 / 6×6、每日挑战、好友挑战完整闭环、暂停/后台、存档刷新保留，8 个页面都截图检查过 |
 | 微信/抖音开发者工具、真机 | **未验证**：本机没有两个开发者工具，也需要你的 AppID |
 | 平台审核 / 发布 | 未提交，未发布 |
@@ -66,7 +68,7 @@
   - **收藏册**：总览（已收藏 x/12、整体进度、已完成主题数）→ 主题卡片（封面、进度条、状态、奖励预览）→ 主题详情（作品网格，未收藏的显示轮廓和解锁条件，只差一件时会突出）→ 作品详情（大图、简介、所属系列、收藏时间、最佳成绩、星星）。
   - 首页有“我的收藏”卡片：总进度、最近解锁、下一个系列奖励；“开始拼图”仍是最显眼的入口。
   - 旧存档升级到 v3 时保留全部成绩与收藏；已经集齐的系列会补发奖励，并在第一次进入收藏册时展示一次庆祝页。
-  - 统一埋点接口 `analytics/Analytics.ts`（`puzzle_started / puzzle_completed / puzzle_replayed / collection_item_unlocked / collection_series_progressed / collection_series_completed / collection_reward_claimed / collection_page_opened`）；调试构建会打印到控制台，默认不上传任何数据，可通过 `setSink` 接微信/抖音官方统计。
+  - 统一埋点接口 `analytics/Analytics.ts`（`puzzle_started / puzzle_completed / puzzle_replayed / collection_item_unlocked / collection_series_progressed / collection_series_completed / collection_reward_claimed / collection_page_opened`）；调试构建会打印到控制台，匿名统计默认关闭，玩家同意后才会上报（见 [统计埋点](docs/ANALYTICS.md)）。
 - **解锁进度**：4 张默认开放，其余按总星数逐步开放。
 - **本地存档**：带版本号的存档，包含 v1→v2 迁移、损坏备份、写入失败提示。
 - **设置**：音乐、音效、振动开关，重看教程，清除存档（二次确认），隐私与平台状态说明，游戏内《隐私政策》《用户协议》（可滚动阅读）。
@@ -82,7 +84,7 @@
 
 ## 2.1 V3–V5 升级（留存 / 社交 / 变现）
 每日任务、每周挑战、等级经验、成就、个人资料、挑战记录与排行（本地/服务器明确区分）、广告频控与统计埋点。详见：
-[功能说明](docs/V3-V5_FEATURES.md) · [存档迁移](docs/SAVE_MIGRATION.md) · [广告接入](docs/ADS_SETUP.md) · [统计埋点](docs/ANALYTICS.md) · [排行榜后端契约](docs/leaderboard-backend.md)。广告默认关闭，统计默认不上传。
+[功能说明](docs/V3-V5_FEATURES.md) · [存档迁移](docs/SAVE_MIGRATION.md) · [广告接入](docs/ADS_SETUP.md) · [统计埋点](docs/ANALYTICS.md) · [排行榜后端契约](docs/leaderboard-backend.md)。广告默认关闭；匿名统计需玩家同意后才开启。
 
 ## 3. 打开与运行
 

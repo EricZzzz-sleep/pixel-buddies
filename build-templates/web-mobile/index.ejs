@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+
+  <title>像素搭子 Pixel Buddies（公测）</title>
+  <meta name="description" content="像素搭子：一款可爱的像素风交换拼图小游戏。每日挑战、收藏图鉴、好友挑战，打开网页就能玩。公测中。">
+  <meta property="og:title" content="像素搭子 Pixel Buddies（公测）">
+  <meta property="og:description" content="可爱的像素风交换拼图，打开网页就能玩。">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#fff6e9">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="apple-touch-icon" href="icon.png">
+
+  <!-- 禁止双指缩放；viewport-fit=cover 让游戏能铺满刘海屏，安全区由游戏自己避让 -->
+  <meta name="viewport"
+        content="width=device-width,user-scalable=no,initial-scale=1,minimum-scale=1,maximum-scale=1,viewport-fit=cover"/>
+
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="像素搭子">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="renderer" content="webkit"/>
+  <meta name="force-rendering" content="webkit"/>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
+  <meta name="msapplication-tap-highlight" content="no">
+  <meta name="full-screen" content="yes"/>
+  <meta name="x5-fullscreen" content="true"/>
+  <meta name="360-fullscreen" content="true"/>
+  <meta name="x5-page-mode" content="app">
+
+  <link rel="stylesheet" type="text/css" href="<%= cssUrl %>"/>
+
+</head>
+<body>
+  <div id="GameDiv" cc_exact_fit_screen="true">
+      <div id="Cocos3dGameContainer">
+        <canvas id="GameCanvas" oncontextmenu="event.preventDefault()" tabindex="99"></canvas>
+      </div>
+    </div>
+
+  <!-- 加载页：引擎和首页就绪之前显示；进度来自真实的加载阶段与已下载字节数 -->
+  <div id="pbLoader" role="status" aria-live="polite">
+    <img class="mascot" src="icon.png" alt="" width="112" height="112">
+    <h1>像素搭子</h1>
+    <p class="sub">PIXEL BUDDIES · BETA</p>
+    <div class="bar" aria-hidden="true"><i id="pbBar"></i></div>
+    <p class="msg" id="pbMsg">正在加载…</p>
+    <button id="pbRetry" type="button">重新加载</button>
+    <noscript><p class="msg">需要开启 JavaScript 才能玩哦</p></noscript>
+  </div>
+
+  <script>
+  (function () {
+    var loader = document.getElementById('pbLoader');
+    var bar = document.getElementById('pbBar');
+    var msg = document.getElementById('pbMsg');
+    var shown = 0, target = 0.04, finished = false, startedAt = Date.now();
+    // 已知的初始加载量（引擎 + 首屏资源）约 3.6MB，用已下载字节数估算进度；到真正就绪才会到 100%
+    var EXPECTED = 3.6 * 1024 * 1024;
+    var bytes = 0;
+
+    function render() {
+      shown += (target - shown) * 0.25;
+      if (target - shown < 0.002) shown = target;
+      bar.style.width = Math.round(shown * 100) + '%';
+      if (!finished) requestAnimationFrame(render);
+    }
+    requestAnimationFrame(render);
+
+    function set(p, text) {
+      if (p > target) target = Math.min(p, 0.98);
+      if (text) msg.textContent = text;
+    }
+
+    try {
+      var po = new PerformanceObserver(function (list) {
+        list.getEntries().forEach(function (e) { bytes += e.transferSize || e.encodedBodySize || 0; });
+        set(0.1 + 0.8 * (1 - Math.exp(-bytes / EXPECTED)));
+      });
+      po.observe({ type: 'resource', buffered: true });
+    } catch (e) { /* 旧浏览器没有 PerformanceObserver：只靠阶段进度 */ }
+
+    function fail(text) {
+      if (finished) return;
+      loader.className = 'failed';
+      msg.textContent = text;
+    }
+
+    document.getElementById('pbRetry').addEventListener('click', function () { location.reload(); });
+    // 15 秒仍未就绪：给出提示；40 秒还没好：提供重新加载
+    setTimeout(function () { if (!finished) msg.textContent = '网络有点慢，再等等…'; }, 15000);
+    setTimeout(function () { fail('加载失败了，请检查网络后重试'); }, 40000);
+    window.addEventListener('error', function (e) {
+      // 只有脚本文件本身加载失败才算启动失败（e.target 是 <script>）
+      if (e && e.target && e.target.tagName === 'SCRIPT') fail('文件没有加载成功，请检查网络后重试');
+    }, true);
+
+    window.__pbBoot = {
+      step: set,
+      fail: fail,
+      ready: function () {
+        if (finished) return;
+        target = 1; shown = 1; bar.style.width = '100%';
+        finished = true;
+        window.__pbLoadMs = Math.round(performance.now());
+        loader.className = 'done';
+        setTimeout(function () { if (loader.parentNode) loader.parentNode.removeChild(loader); }, 500);
+      }
+    };
+
+    // 禁止 iOS Safari 的双指缩放、双击缩放、长按选字与右键菜单（输入框除外）
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (t) {
+      document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+    });
+    document.addEventListener('selectstart', function (e) {
+      var tag = e.target && e.target.tagName;
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA') e.preventDefault();
+    });
+    document.addEventListener('contextmenu', function (e) {
+      var tag = e.target && e.target.tagName;
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA') e.preventDefault();
+    });
+    // 请求持久化存储，降低浏览器在空间紧张时清掉存档的概率（不弹窗；是否授予由浏览器决定）
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* 忽略 */ }
+  })();
+  </script>
+
+  <%- include(cocosTemplate, {}) %>
+</body>
+</html>

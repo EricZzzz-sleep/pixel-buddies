@@ -11,3 +11,7 @@ tools/node_modules/
 # 音乐生成器输出
 music-out/
 __pycache__/
+
+# 网页发布产物
+dist/
+.wrangler/

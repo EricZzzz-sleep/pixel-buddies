@@ -1,0 +1,15 @@
+# Cloudflare Pages 配置（像素搭子公测）。
+# 部署：npm --prefix tools run web:deploy （见 docs/PUBLIC_BETA.md）
+name = "pixel-buddies"
+pages_build_output_dir = "dist"
+compatibility_date = "2025-11-01"
+
+# 统计与反馈需要一个 D1 数据库。创建后把 database_id 填进来并取消注释：
+#   npx wrangler d1 create pixel-buddies
+#   npx wrangler d1 execute pixel-buddies --remote --file=functions/schema.sql
+# 没有这段绑定时，/api/events 与 /api/feedback 返回 503，游戏会如实提示“反馈通道未开通”，统计静默丢弃。
+#
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "pixel-buddies"
+# database_id = "替换为 wrangler d1 create 输出的 id"

@@ -96,6 +96,8 @@ export class BrowserAdapter implements PlatformAdapter {
         doc.addEventListener('visibilitychange', () => {
             if (doc.visibilityState === 'hidden') cb();
         });
+        // iOS Safari 关闭标签页/划走时可能只触发 pagehide，不触发 visibilitychange
+        this.win.addEventListener('pagehide', () => cb());
     }
 
     getWindowSize(): { width: number; height: number } {
@@ -192,6 +194,8 @@ export class BrowserAdapter implements PlatformAdapter {
                 method: opts.method || 'GET',
                 headers: { 'content-type': 'application/json' },
                 body: opts.body ? JSON.stringify(opts.body) : undefined,
+                // 页面进入后台/关闭时，让浏览器尽量把这次小请求发完
+                keepalive: opts.method === 'POST',
                 signal: ctl ? ctl.signal : undefined,
             });
             if (timer) this.win.clearTimeout(timer);

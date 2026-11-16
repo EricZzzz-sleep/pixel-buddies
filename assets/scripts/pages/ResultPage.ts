@@ -230,7 +230,7 @@ export class ResultPage extends BasePage {
         if (pu.weeklyCompleted) gm.analytics.track('weekly_challenge_completed', { week: gm.progress.weeklyView().challenge.weekKey });
         for (const a of achievements) gm.analytics.track('achievement_unlocked', { id: a.id });
         const levelAfter = fu ? fu.levelAfter : pu.levelAfter;
-        if (levelAfter > pu.levelBefore) gm.analytics.track('player_level_up', { level: levelAfter });
+        if (levelAfter > pu.levelBefore) gm.analytics.track('level_up', { level: levelAfter });
         return {
             xp: pu.xpGained + (fu ? fu.xpGained : 0),
             levelBefore: pu.levelBefore,

@@ -1,0 +1,30 @@
+import { Application } from '<%= applicationJS %>';
+
+const canvas = document.getElementById('GameCanvas');
+const $p = canvas.parentElement;
+const bcr = $p.getBoundingClientRect();
+canvas.width = bcr.width;
+canvas.height = bcr.height;
+
+function topLevelImport (url) {
+    return System.import(url);
+}
+
+// 加载页进度：每个真实阶段完成后推进一次
+const boot = window.__pbBoot || { step() {}, fail() {} };
+const application = new Application();
+
+boot.step(0.12, '正在加载游戏引擎…');
+topLevelImport('cc')
+.then((engine) => {
+    boot.step(0.55, '正在准备游戏…');
+    // 跳过 Cocos 自带的开屏（默认强制显示约 2 秒）：加载页已经负责展示进度，不需要再等
+    engine.game.onPostBaseInitDelegate.add(() => engine.settings.overrideSettings('splashScreen', 'totalTime', 0));
+    return application.init(engine);
+}).then(() => {
+    boot.step(0.75, '正在加载首页…');
+    return application.start();
+}).catch((err) => {
+    console.error(err);
+    boot.fail('游戏没能启动，请刷新重试');
+});

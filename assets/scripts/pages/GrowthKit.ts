@@ -142,7 +142,7 @@ export function handleClaim(res: ClaimResult, after?: () => void): void {
     gm.audio.play('star', 0.6);
     gm.scene.toast(`经验 +${res.xp}`, 1.2);
     if (res.levelAfter > res.levelBefore) {
-        gm.analytics.track('player_level_up', { level: res.levelAfter });
+        gm.analytics.track('level_up', { level: res.levelAfter });
         showLevelUp(res.levelAfter, res.newTitle, after);
     } else if (after) after();
 }

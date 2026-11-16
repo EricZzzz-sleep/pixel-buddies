@@ -47,11 +47,27 @@ export const DOUYIN_CONFIG: PlatformReleaseConfig = {
 
 export const RELEASE = {
     /** 游戏内展示的版本号 */
-    version: '1.0.0',
+    version: '1.0.0-beta.1',
     /** 广告总开关：即使填了广告位，也需要显式打开 */
     adsEnabled: false,
-    /** 是否允许把匿名事件上报到平台分析接口（默认关闭，仅本地记录） */
+    /** 是否同时把事件上报到平台自带分析（wx.reportEvent / tt.reportAnalytics；需在后台建同名事件，默认关闭）。
+     *  无论此项如何，只有玩家同意匿名统计后才会有任何事件离开设备。 */
     analyticsRemoteEnabled: false,
+    /** 小游戏端的自有后端地址（https，需加入平台合法域名）；留空 = 小游戏端不上报、不收反馈 */
+    miniApiBase: '',
     /** 服务器排行榜地址（预留）；为空表示无后端，只显示本地成绩 */
     leaderboardEndpoint: '',
 };
+
+/**
+ * 自有后端（统计 + 反馈）的地址：
+ * - Web：部署在 Cloudflare Pages 时与页面同源（/api，由 functions/ 提供）；本地调试/文件预览不连接；
+ * - 小游戏：使用 RELEASE.miniApiBase（默认空 = 不启用）。
+ */
+export function resolveApiBase(kind: string, hostname: string, miniApiBase: string = RELEASE.miniApiBase): string {
+    if (kind !== 'web') return miniApiBase;
+    const h = (hostname || '').toLowerCase();
+    if (!h || h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h.endsWith('.local') || h.endsWith('.localhost')) return '';
+    if (/^(10|192\.168)\./.test(h) || /^172\.(1[6-9]|2\d|3[01])\./.test(h)) return '';
+    return '/api';
+}

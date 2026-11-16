@@ -1,8 +1,11 @@
 import { AdManager } from '../ads/AdManager';
 import { Analytics } from '../analytics/Analytics';
+import { BatchSink } from '../analytics/BatchSink';
+import { PrivacyManager, randomId } from '../analytics/Privacy';
 import { PlatformAnalyticsSink } from '../analytics/PlatformSink';
+import { FeedbackService } from '../feedback/FeedbackService';
 import { createLeaderboard, LeaderboardService, LocalLeaderboard } from '../social/LeaderboardService';
-import { RELEASE } from '../config/PlatformConfig';
+import { RELEASE, resolveApiBase } from '../config/PlatformConfig';
 import { ProgressManager } from '../progress/ProgressManager';
 import { TextureFactory } from '../art/TextureFactory';
 import { CustomArtStore } from '../art/CustomArtStore';
@@ -67,6 +70,41 @@ export class GameManager {
         return GameManager._inst;
     }
 
+    /**
+     * 会话开始事件：只有玩家同意匿名统计后才会发出（同意前的事件不补发）。
+     * 冷启动调用一次；玩家在本次会话中途点“同意”时再调用一次。
+     */
+    announceSession(loadingMs?: number): void {
+        if (!this.privacy.enabled() || this.sessionAnnounced) return;
+        this.sessionAnnounced = true;
+        const launch = this.save.data.launchCount;
+        this.analytics.track('game_opened', { platform: this.platform.kind, version: RELEASE.version, launch });
+        this.analytics.track('app_session_started', { launch, returning: launch > 1 });
+        if (loadingMs && loadingMs > 0) this.analytics.track('loading_time', { ms: Math.round(loadingMs), platform: this.platform.kind });
+    }
+
+    /** 进入后台：记录时间并尽力把待发事件发出去 */
+    onAppHidden(): void {
+        this.hiddenAt = Date.now();
+        this.flushAnalytics();
+    }
+
+    /** 回到前台：离开超过 30 分钟算一次新的会话 */
+    onAppShown(): void {
+        if (this.hiddenAt && Date.now() - this.hiddenAt > 30 * 60 * 1000) {
+            this.sessionId = randomId(6);
+            this.sessionAnnounced = false;
+            this.analytics.resetOnce();
+            this.announceSession();
+        }
+        this.hiddenAt = 0;
+    }
+
+    /** 进入后台时尽力把待发事件发出去 */
+    flushAnalytics(): void {
+        if (this.batch && this.privacy.enabled()) void this.batch.flush();
+    }
+
     static get ready(): boolean {
         return !!GameManager._inst;
     }
@@ -78,7 +116,16 @@ export class GameManager {
     readonly challenges: ChallengeManager;
     readonly share: ShareManager;
     readonly ads: AdManager;
-    readonly analytics = new Analytics();
+    readonly privacy: PrivacyManager;
+    readonly feedback: FeedbackService;
+    readonly analytics: Analytics;
+    /** 匿名会话编号：每次打开随机生成，不写入存储 */
+    sessionId = randomId(6);
+    private sessionAnnounced = false;
+    private hiddenAt = 0;
+    /** 自有后端地址（统计与反馈共用）；空 = 未配置 */
+    readonly apiBase: string;
+    private batch: BatchSink | null = null;
     readonly progress: ProgressManager;
     readonly leaderboard: LeaderboardService;
     readonly textures = new TextureFactory();
@@ -88,6 +135,13 @@ export class GameManager {
     layout!: Layout;
 
     constructor(readonly platform: PlatformAdapter) {
+        this.privacy = new PrivacyManager(platform.storage);
+        this.analytics = new Analytics(() => this.privacy.enabled());
+        this.apiBase = resolveApiBase(platform.kind, (globalThis as { location?: { hostname?: string } }).location?.hostname || '');
+        this.feedback = new FeedbackService(platform.capabilities.request ? (r) => platform.request(r) : null, this.apiBase, () => {
+            const w = platform.getWindowSize();
+            return { version: RELEASE.version, platform: platform.kind, vw: Math.round(w.width), vh: Math.round(w.height) };
+        });
         this.save = new SaveManager(platform.storage);
         this.collection = new CollectionManager(this.save);
         this.daily = new DailyChallengeManager(this.save);
@@ -99,7 +153,19 @@ export class GameManager {
             return r && r.completed ? { timeMs: r.bestTimeMs, moves: r.bestMoves } : null;
         });
         this.leaderboard = createLeaderboard(RELEASE.leaderboardEndpoint, platform.capabilities.request ? (r) => platform.request(r) : null, local, RELEASE.version);
-        this.analytics.addSink(new PlatformAnalyticsSink(platform));
+        if (RELEASE.analyticsRemoteEnabled) this.analytics.addSink(new PlatformAnalyticsSink(platform));
+        if (this.apiBase && platform.capabilities.request) {
+            const batch = new BatchSink(
+                (body) => platform.request({ url: `${this.apiBase}/events`, method: 'POST', body: body as unknown as Record<string, unknown>, timeoutMs: 8000 }),
+                () => ({ sid: this.sessionId, iid: this.privacy.installId() || undefined, app: { version: RELEASE.version, platform: platform.kind } }),
+            );
+            this.batch = batch;
+            this.analytics.addSink(batch);
+            // 玩家关闭统计：立刻丢掉还没发出去的事件
+            this.privacy.subscribe(() => {
+                if (!this.privacy.enabled()) batch.clear();
+            });
+        }
         this.share.onShare = (kind) => this.analytics.track('share_clicked', { kind });
         this.ads = new AdManager(platform, this.save, this.analytics);
         this.customArt = new CustomArtStore(this.save);

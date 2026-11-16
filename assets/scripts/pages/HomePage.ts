@@ -6,6 +6,7 @@ import { formatDuration } from '../core/GameTimer';
 import { Theme } from '../ui/Theme';
 import { button, ButtonHandle, drawPanel, label, makeNode, onTap, panel, popIn, sprite, starRow } from '../ui/UIKit';
 import { BasePage } from './BasePage';
+import { PrivacyBanner } from './PrivacyBanner';
 import { redDot } from './GrowthKit';
 import { artFrame, fmtDate, Flow, openDifficultySheet, segmentBar, setLabel, starFrames } from './PageKit';
 
@@ -31,6 +32,8 @@ export class HomePage extends BasePage {
     private avatarG!: Graphics;
     private avatarBadge!: Node;
     private dailyStarsHolder!: Node;
+    private banner: PrivacyBanner | null = null;
+    private bannerShown = false;
     private animNodes: Node[] = [];
     private animBases: Vec3[] = [];
 
@@ -173,6 +176,13 @@ export class HomePage extends BasePage {
         setLabel(this.subLabel, `Lv.${pg.level().level} ${pg.title()} · 今日任务 ${mv.doneCount}/${mv.items.length}`);
         if (this.goalsDot) this.goalsDot.active = pg.claimableCount() > 0;
 
+        // 首次启动：底部提示“匿名统计”说明（每次打开游戏最多出现一次，不打断玩法）
+        if (!this.bannerShown && gm.privacy.needsPrompt()) {
+            this.bannerShown = true;
+            this.banner = this.banner || new PrivacyBanner(this.sm);
+            this.banner.show();
+        }
+
         // 每日挑战
         const daily = gm.daily.getToday();
         const art = getArt(daily.imageId)!;
@@ -222,6 +232,7 @@ export class HomePage extends BasePage {
     }
 
     onExit(): void {
+        if (this.banner) this.banner.hide();
         this.animNodes.forEach((n, i) => {
             Tween.stopAllByTarget(n);
             if (this.animBases[i]) n.setPosition(this.animBases[i]);

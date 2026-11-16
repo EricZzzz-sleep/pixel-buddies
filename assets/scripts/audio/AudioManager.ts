@@ -42,7 +42,7 @@ export class AudioManager {
     private suspended = false;
 
     private bundles = new Map<string, AssetManager.Bundle>();
-    private failedBundles = new Set<string>();
+    private failedBundles = new Map<string, number>();
     private bundleWaiters = new Map<string, ((b: AssetManager.Bundle | null) => void)[]>();
     private musicClips = new Map<string, AudioClip>();
     /** 最近一次请求的曲目或歌单（加载是异步的，只播放最后请求的那一个） */
@@ -127,6 +127,9 @@ export class AudioManager {
         this.playPlaylistTrack(this.wantedId, FADE_OUT);
     }
 
+    /** 资源加载失败回调（用于统计 asset_load_failed；已自动改用保底音乐） */
+    onLoadFailed: (kind: string, id: string) => void = () => undefined;
+
     /** 进入后台 */
     suspend(): void {
         this.suspended = true;
@@ -171,7 +174,9 @@ export class AudioManager {
 
     private withBundle(name: string, cb: (b: AssetManager.Bundle | null) => void): void {
         const ready = this.bundles.get(name);
-        if (ready || this.failedBundles.has(name)) {
+        const failedAt = this.failedBundles.get(name);
+        // 失败的分包 30 秒后允许重试（手机网络抖动很常见），期间直接用保底音乐
+        if (ready || (failedAt !== undefined && Date.now() - failedAt < 30000)) {
             cb(ready || null);
             return;
         }
@@ -184,7 +189,8 @@ export class AudioManager {
         assetManager.loadBundle(name, (err, bundle) => {
             if (err || !bundle) {
                 console.warn(`[Audio] 音乐分包 ${name} 加载失败，改用保底音乐`, err);
-                this.failedBundles.add(name);
+                this.failedBundles.set(name, Date.now());
+                this.onLoadFailed('music_bundle', name);
             } else {
                 this.bundles.set(name, bundle);
             }
@@ -208,6 +214,7 @@ export class AudioManager {
             bundle.load(info.file, AudioClip, (err, clip) => {
                 if (err || !clip) {
                     console.warn(`[Audio] 背景音乐加载失败 ${info.id}`, err);
+                    this.onLoadFailed('music', info.id);
                     this.loadFallback(cb);
                     return;
                 }

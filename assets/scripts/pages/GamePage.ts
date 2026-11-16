@@ -156,7 +156,10 @@ export class GamePage extends BasePage {
         this.titleLabel.string = art ? art.name : '像素拼图';
         const d = DIFFICULTIES[session.spec.grid];
         this.tagLabel.string = `${MODE_TAG[session.mode]} · ${d.label} ${d.desc}`;
+        const firstEver = gm.save.data.totalPlays === 0;
         gm.collection.recordPlayStarted();
+        if (firstEver) gm.analytics.track('first_game_started', { mode: session.mode, grid: session.spec.grid });
+        if (session.mode === 'daily') gm.analytics.track('daily_challenge_started', { grid: session.spec.grid });
         // 同一张作品已经收藏过：算“重玩”（用于判断收藏系统是否带来复玩）
         if (gm.collection.isCollected(session.spec.imageId)) gm.analytics.track('puzzle_replayed', { image: session.spec.imageId, grid: session.spec.grid, mode: session.mode });
         gm.analytics.track('puzzle_started', { mode: session.mode, image: session.spec.imageId, grid: session.spec.grid });
@@ -168,6 +171,10 @@ export class GamePage extends BasePage {
     }
 
     onExit(): void {
+        // 没做完就离开（点返回/回首页）：记一次“放弃”，用于判断难度和卡点
+        if (this.pm && this.session && !this.pm.finished && !this.finishing) {
+            this.gm.analytics.track('puzzle_abandoned', { mode: this.session.mode, grid: this.session.spec.grid, time: Math.round(this.pm.getResult().timeMs / 1000), moves: this.pm.moves });
+        }
         this.setPeek(false);
         this.closeTutorial(false);
         this.sm.closeAllModals();
@@ -338,6 +345,7 @@ export class GamePage extends BasePage {
         const bp = this.board.node.position;
         this.scheduleCall(0.6, () => this.fx.confetti(this.L.w, this.L.h / 2, bp.y - 200, 46));
         gm.analytics.track('puzzle_completed', { mode: this.session.mode, grid: result.grid, time: Math.round(result.timeMs / 1000), moves: result.moves });
+        if (this.session.mode === 'daily') gm.analytics.track('daily_challenge_completed', { grid: result.grid, time: Math.round(result.timeMs / 1000) });
         const payload: ResultPayload = { session: this.session, result };
         const goResult = () => this.sm.go('result', payload, { replace: true });
         // 教程庆祝卡片还在时，等玩家点“看结果”再进入结算页
