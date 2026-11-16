@@ -5,6 +5,7 @@ import { formatDuration } from '../core/GameTimer';
 import { PlaySession, ResultPayload } from '../core/GameManager';
 import { PuzzleBoard } from '../puzzle/PuzzleBoard';
 import { BEGINNER_GRID } from '../config/GameConfig';
+import { identicalTileCells } from '../puzzle/TileSignature';
 import { PuzzleManager, SwapOutcome } from '../puzzle/PuzzleManager';
 import { computeStars, movesHudText } from '../puzzle/PuzzleScoring';
 import { Effects } from '../ui/Effects';
@@ -149,7 +150,9 @@ export class GamePage extends BasePage {
         this.paused = false;
         this.finishing = false;
         this.lastShownSecond = -1;
-        this.pm = new PuzzleManager(session.spec);
+        // 长得一模一样的方块不参与打乱，避免“看起来拼好了却没完成”
+        const canvas = gm.textures.artCanvas(session.spec.imageId);
+        this.pm = new PuzzleManager(session.spec, undefined, identicalTileCells(canvas.data, canvas.w, session.spec.grid));
         this.board.start(this.pm);
         this.board.setEnabled(true);
         const art = this.gm.resolveArt(session.spec.imageId);

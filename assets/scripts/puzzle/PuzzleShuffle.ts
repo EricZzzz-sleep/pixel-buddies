@@ -10,17 +10,20 @@ import { isPermutation, isSolved, countFixedPoints } from './PuzzleValidator';
  *
  * 结果：恰好 2×swaps 个方块错位，且每一对都是独立的二元环，
  * 因此正好 swaps 次交换就能还原（最优步数 = swaps），不存在无解关卡。
- * 相同的 (n, swaps, rng 种子) 永远得到相同结果。
+ * 相同的 (n, swaps, rng 种子, fixed) 永远得到相同结果；fixed 为空时与旧版本结果完全一致。
+ *
+ * @param fixed 不参与打乱的格子（例如与其他格子长得一模一样的方块），它们始终留在正确位置
  */
-export function shuffleOrder(n: number, rng: SeededRandom, swaps: number): number[] {
+export function shuffleOrder(n: number, rng: SeededRandom, swaps: number, fixed: readonly number[] = []): number[] {
     if (n < 2) throw new Error(`拼图块数过少：${n}`);
-    if (!Number.isInteger(swaps) || swaps < 1 || swaps * 2 > n) throw new Error(`交换次数不合法：${swaps}（${n} 块）`);
-
+    const skip = new Set(fixed.filter((c) => c >= 0 && c < n));
     const cells: number[] = [];
-    for (let i = 0; i < n; i++) cells.push(i);
+    for (let i = 0; i < n; i++) if (!skip.has(i)) cells.push(i);
+    const m = cells.length;
+    if (!Number.isInteger(swaps) || swaps < 1 || swaps * 2 > m) throw new Error(`交换次数不合法：${swaps}（可打乱 ${m} 块）`);
     const used = swaps * 2;
     for (let i = 0; i < used; i++) {
-        const j = i + rng.int(n - i);
+        const j = i + rng.int(m - i);
         const t = cells[i];
         cells[i] = cells[j];
         cells[j] = t;
@@ -35,11 +38,13 @@ export function shuffleOrder(n: number, rng: SeededRandom, swaps: number): numbe
     }
 
     if (!isPermutation(order, n) || isSolved(order) || countFixedPoints(order) !== n - used) {
-        // 理论上不会发生：保底使用前 2×swaps 个格子按顺序两两配对
+        // 理论上不会发生：保底使用前 2×swaps 个可打乱格子按顺序两两配对
+        const free: number[] = [];
+        for (let i = 0; i < n; i++) if (!skip.has(i)) free.push(i);
         for (let i = 0; i < n; i++) order[i] = i;
         for (let k = 0; k < swaps; k++) {
-            order[k * 2] = k * 2 + 1;
-            order[k * 2 + 1] = k * 2;
+            order[free[k * 2]] = free[k * 2 + 1];
+            order[free[k * 2 + 1]] = free[k * 2];
         }
     }
     return order;

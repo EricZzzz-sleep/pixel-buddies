@@ -270,3 +270,38 @@ test('步数显示：先三星上限，超过换二星上限，再超过只显�
     assert.equal(movesHudText(6, b), '6/6 步');
     assert.equal(movesHudText(7, b), '7 步');
 });
+
+test('长得一模一样的方块不参与打乱：所有作品、所有难度都不会出现“看起来拼好了却没完成”', async () => {
+    const { ART_LIST } = await import('../../assets/scripts/art/ArtCatalog');
+    const { renderArt } = await import('../../assets/scripts/art/PuzzleArt');
+    const { identicalTileCells } = await import('../../assets/scripts/puzzle/TileSignature');
+    let checked = 0;
+    for (const a of ART_LIST) {
+        const c = renderArt(a.id);
+        for (const grid of [3, 4, 5, 6] as GridSize[]) {
+            const fixed = identicalTileCells(c.data, c.w, grid);
+            for (let seed = 0; seed < 40; seed++) {
+                const l = generateLayout({ imageId: a.id, grid, seed }, fixed);
+                assert.ok(isPermutation(l.order, grid * grid));
+                assert.ok(!isSolved(l.order));
+                for (const cell of fixed) assert.equal(l.order[cell], cell, `${a.id} ${grid}×${grid} seed ${seed}：格子 ${cell} 与别的格子长得一样，不应被打乱`);
+                assert.equal(minSwapsToSolve(l.order), l.swaps);
+                assert.equal(l.swaps, DIFFICULTIES[grid].swaps, `${a.id} ${grid}×${grid} 难度不应因此降低`);
+                checked++;
+            }
+        }
+    }
+    assert.ok(checked > 0);
+});
+
+test('identicalTileCells：纯色画面全部相同；没有重复时为空；没有排除格子时打乱结果与旧版本一致', async () => {
+    const { identicalTileCells } = await import('../../assets/scripts/puzzle/TileSignature');
+    const flat = new Uint8Array(60 * 60 * 4).fill(200);
+    assert.equal(identicalTileCells(flat, 60, 4).length, 16);
+    const noisy = new Uint8Array(60 * 60 * 4).map((_, i) => (i * 2654435761) >>> 24);
+    assert.deepEqual(identicalTileCells(noisy, 60, 6), []);
+    for (let seed = 0; seed < 50; seed++) assert.deepEqual(generateLayout({ imageId: 'x', grid: 5, seed }, []).order, generateLayout({ imageId: 'x', grid: 5, seed }).order);
+    // 纯色作品：可打乱格子不足时退回普通打乱，仍能出题
+    const l = generateLayout({ imageId: 'x', grid: 4, seed: 1 }, identicalTileCells(flat, 60, 4));
+    assert.ok(!isSolved(l.order));
+});
