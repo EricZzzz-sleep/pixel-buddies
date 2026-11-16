@@ -6,10 +6,11 @@ import { ART_LIST, ArtCategory, getArt } from '../art/ArtCatalog';
  * - 甜品派对：草莓蛋糕、珍珠奶茶、马卡龙塔、三球冰淇淋（分类 food）
  * - 温馨日常：卧室、小花园、星空小屋、海边日落（分类 life + nature）
  * - 十二生肖：鼠牛虎兔龙蛇马羊猴鸡狗猪（分类 zodiac，ZodiacArt.ts）
+ * - 十二星座：白羊到双鱼（分类 stars，StarsArt.ts）
  * 每张图恰好属于一个系列；tests/collection.test.ts 会检查这一点。
  */
 
-export type SeriesId = 'animals' | 'sweets' | 'daily' | 'zodiac';
+export type SeriesId = 'animals' | 'sweets' | 'daily' | 'zodiac' | 'stars';
 
 export interface SeriesReward {
     /** 收藏徽章 */
@@ -80,6 +81,17 @@ export const SERIES_LIST: SeriesInfo[] = [
         tint: 'pink',
         reward: { badge: '福星徽章', frame: '灯笼头像框', background: '新春窗花背景', color: 0xd65a63 },
         categories: ['zodiac'],
+    },
+    {
+        id: 'stars',
+        no: 5,
+        name: '十二星座',
+        desc: '从白羊到双鱼，一起数星星',
+        cover: 'stars_leo',
+        items: ['stars_aries', 'stars_taurus', 'stars_gemini', 'stars_cancer', 'stars_leo', 'stars_virgo', 'stars_libra', 'stars_scorpio', 'stars_sagittarius', 'stars_capricorn', 'stars_aquarius', 'stars_pisces'],
+        tint: 'lilac',
+        reward: { badge: '星光徽章', frame: '星座头像框', background: '银河背景', color: 0x7462b0 },
+        categories: ['stars'],
     },
 ];
 

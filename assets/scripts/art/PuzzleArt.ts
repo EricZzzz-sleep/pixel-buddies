@@ -1,6 +1,7 @@
 import { ART_SIZE } from '../config/GameConfig';
 import { P } from './Palette';
 import { PixelCanvas } from './PixelCanvas';
+import { STARS_PAINTERS } from './StarsArt';
 import { ZODIAC_PAINTERS } from './ZodiacArt';
 
 /**
@@ -527,6 +528,7 @@ export const PAINTERS: Record<string, Painter> = {
     starry_night: starryNight,
     beach_sunset: beachSunset,
     ...ZODIAC_PAINTERS,
+    ...STARS_PAINTERS,
 };
 
 /** 渲染指定作品为 60×60 像素画；未知 ID 返回奶油色占位图（不会抛错） */

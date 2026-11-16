@@ -8,14 +8,14 @@ import { Mask, MaskPainter, PixelCanvas } from './PixelCanvas';
 
 type Painter = (c: PixelCanvas) => void;
 
-interface Fur {
+export interface Fur {
     fill: number;
     shadow: number;
     light?: number;
     outline?: number;
 }
 
-const style = (f: Fur, depth = 2) => ({ fill: f.fill, outline: f.outline ?? P.ink, light: f.light, shadow: f.shadow, shadowDepth: depth });
+export const style = (f: Fur, depth = 2) => ({ fill: f.fill, outline: f.outline ?? P.ink, light: f.light, shadow: f.shadow, shadowDepth: depth });
 
 /** 身体 + 头（耳朵/角画在 head 回调里，和头合成一个形状） */
 function chibi(c: PixelCanvas, fur: Fur, head: (m: MaskPainter) => void, body?: (m: MaskPainter) => void): Mask {
@@ -23,7 +23,7 @@ function chibi(c: PixelCanvas, fur: Fur, head: (m: MaskPainter) => void, body?: 
     return c.shape(style(fur), head);
 }
 
-function eyes(c: PixelCanvas, cx: number, cy: number, kind: 'dot' | 'happy' | 'sleepy' = 'dot', gap = 7): void {
+export function eyes(c: PixelCanvas, cx: number, cy: number, kind: 'dot' | 'happy' | 'sleepy' = 'dot', gap = 7): void {
     for (const ex of [cx - gap, cx + gap - 1]) {
         if (kind === 'happy') {
             c.px(ex - 1, cy, P.ink); c.px(ex, cy - 1, P.ink); c.px(ex + 1, cy - 1, P.ink); c.px(ex + 2, cy, P.ink);
@@ -36,16 +36,16 @@ function eyes(c: PixelCanvas, cx: number, cy: number, kind: 'dot' | 'happy' | 's
     }
 }
 
-function cheeks(c: PixelCanvas, cx: number, cy: number, gap = 10, col = P.pink2): void {
+export function cheeks(c: PixelCanvas, cx: number, cy: number, gap = 10, col = P.pink2): void {
     c.rect(cx - gap - 2, cy, 3, 2, col);
     c.rect(cx + gap, cy, 3, 2, col);
 }
 
-function mouthW(c: PixelCanvas, cx: number, cy: number): void {
+export function mouthW(c: PixelCanvas, cx: number, cy: number): void {
     c.px(cx - 2, cy, P.ink); c.px(cx - 1, cy + 1, P.ink); c.px(cx, cy, P.ink); c.px(cx + 1, cy + 1, P.ink); c.px(cx + 2, cy, P.ink);
 }
 
-function smile(c: PixelCanvas, cx: number, cy: number): void {
+export function smile(c: PixelCanvas, cx: number, cy: number): void {
     c.px(cx - 2, cy, P.ink); c.px(cx - 1, cy + 1, P.ink); c.px(cx, cy + 1, P.ink); c.px(cx + 1, cy, P.ink);
 }
 
