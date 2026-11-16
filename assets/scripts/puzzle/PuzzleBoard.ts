@@ -285,23 +285,24 @@ export class PuzzleBoard {
     }
 
     /**
-     * 刷新引导。优先级：玩家当前拿起/选中的方块 > 固定引导（提示/教程）。
-     * 目标格 = 该方块的原始位置（方块 ID）。已归位（锁定）的格子永远不会被当作目标。
+     * 刷新引导。
+     * - 玩家拿起/选中方块时只高亮这块本身（粉框），**不再**自动提示它该去哪（不画箭头、不高亮目标格）；
+     * - 固定引导（玩家主动点“提示”、新手教程）才显示“粉色源 → 绿色目标 + 箭头”；
+     *   教程里拿起的正好是引导中的方块时，引导保持显示。
      */
     private refreshGuide(activeFrom: number): void {
         const pm = this.pm;
         let from = -1, to = -1;
         if (pm) {
-            if (activeFrom >= 0 && this.pieces[activeFrom]) {
+            if (activeFrom >= 0 && this.pieces[activeFrom] && !(this.pin && this.pin.from === activeFrom)) {
                 from = activeFrom;
-                to = this.pieces[activeFrom].pieceId;
             } else if (this.pin) {
                 from = this.pin.from;
                 to = this.pin.to;
-            }
-            if (from >= 0 && (to === from || to < 0 || to >= pm.n || pm.isCellCorrect(to) || pm.isCellCorrect(from))) {
-                from = -1;
-                to = -1;
+                if (to === from || to < 0 || to >= pm.n || pm.isCellCorrect(to) || pm.isCellCorrect(from)) {
+                    from = -1;
+                    to = -1;
+                }
             }
         }
         if (from === this.gFrom && to === this.gTo) return;
@@ -310,6 +311,7 @@ export class PuzzleBoard {
         this.gFrom = from;
         this.gTo = to;
         this.pieces[from].setGlow('selected');
+        if (to < 0) return;
         const dest = this.pieces[to];
         dest.setGlow('dest');
         dest.pulseLoop(true);
