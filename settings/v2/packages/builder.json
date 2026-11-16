@@ -13,6 +13,18 @@
             "configMode": "auto"
           }
         }
+      },
+      "pb_music_remote_cfg": {
+        "displayName": "music-remote",
+        "configs": {
+          "miniGame": {
+            "preferredOptions": {
+              "isRemote": true,
+              "compressionType": "merge_dep"
+            },
+            "configMode": "auto"
+          }
+        }
       }
     }
   }

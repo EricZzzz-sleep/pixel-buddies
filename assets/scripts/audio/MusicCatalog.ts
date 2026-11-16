@@ -5,8 +5,8 @@ import { seriesOfItem, SeriesId } from '../collection/SeriesCatalog';
  *
  * 全部曲目都放在独立的 Asset Bundle 里（小游戏上设为“小游戏分包”，不占 4MB 主包）：
  * - `music`：菜单歌单 5 首（午后像素、拼图时光、甜品派对、星空小屋由 tools/gen-music.py 合成；Pink Haze 是作者录音）；
- * - `music_animals` / `music_sweets` / `music_daily`：12 张作品各自的主题曲（tools/gen-themes.py 合成，约 2:40），
- *   按系列拆成 3 个分包，玩到哪个系列才下载哪个。
+ * - `music_animals` / `music_sweets` / `music_daily` / `music_zodiac`：每张内置作品各自的主题曲（tools/gen-themes.py 合成，约 2:40），
+ *   按系列拆成分包，玩到哪个系列才下载哪个。
  *
  * 选曲规则：
  * - 菜单类页面（首页、经典、每日、收藏册、设置等）：菜单歌单轮播，每首约 2:40 后淡出换下一首；
@@ -32,6 +32,7 @@ export const THEME_BUNDLES: Record<SeriesId, string> = {
     animals: 'music_animals',
     sweets: 'music_sweets',
     daily: 'music_daily',
+    zodiac: 'music_zodiac',
 };
 
 const CORE: BgmInfo[] = [
@@ -56,6 +57,19 @@ export const THEME_TITLES: Record<string, string> = {
     flower_garden: '蝴蝶来访',
     starry_night: '第一百颗星',
     beach_sunset: '落日口袋',
+    // 十二生肖（五声音阶）
+    zodiac_rat: '数铜钱',
+    zodiac_ox: '田埂慢歌',
+    zodiac_tiger: '竹林巡山',
+    zodiac_rabbit: '月饼与月亮',
+    zodiac_dragon: '云上龙珠',
+    zodiac_snake: '花间午睡',
+    zodiac_horse: '马蹄轻轻',
+    zodiac_goat: '云朵牧场',
+    zodiac_monkey: '偷桃记',
+    zodiac_rooster: '第一声早安',
+    zodiac_dog: '红围巾',
+    zodiac_pig: '元宝滚滚',
 };
 
 const THEMES: BgmInfo[] = Object.keys(THEME_TITLES).map((artId) => {
@@ -103,6 +117,7 @@ export const SERIES_BGM: Record<SeriesId, BgmId> = {
     animals: 'pinkhaze',
     sweets: 'sweets',
     daily: 'cabin',
+    zodiac: 'theme_zodiac_dragon',
 };
 
 export const FOCUS_BGM: BgmId = 'puzzle';

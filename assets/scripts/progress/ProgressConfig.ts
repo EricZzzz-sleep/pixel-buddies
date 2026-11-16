@@ -1,3 +1,4 @@
+import { ART_LIST } from '../art/ArtCatalog';
 import { SERIES_LIST, SeriesInfo } from '../collection/SeriesCatalog';
 import { hashString, SeededRandom } from '../core/Random';
 import { shiftDateKey } from '../daily/DailyChallengeManager';
@@ -188,7 +189,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     { id: 'puzzles_10', title: '十局达人', desc: '累计完成 10 局拼图', target: 10, xp: 50, icon: 'steps', value: (s) => s.puzzlesCompleted },
     { id: 'puzzles_50', title: '五十局老手', desc: '累计完成 50 局拼图', target: 50, xp: 120, icon: 'trophy', value: (s) => s.puzzlesCompleted },
     { id: 'first_series', title: '第一个系列', desc: '集齐任意一个主题系列', target: 1, xp: 80, icon: 'book', value: (s) => s.seriesDone },
-    { id: 'collect_all', title: '全收藏', desc: '收藏全部 12 件作品', target: 12, xp: 150, icon: 'crown', value: (s) => s.collectedCount },
+    { id: 'collect_all', title: '全收藏', desc: `收藏全部 ${ART_LIST.length} 件作品`, target: ART_LIST.length, xp: 150, icon: 'crown', value: (s) => s.collectedCount },
     { id: 'all_missions', title: '任务达人', desc: '在同一天完成全部每日任务', target: 1, xp: 60, icon: 'check', value: (s) => s.missionDays },
     { id: 'daily_7', title: '每日坚持', desc: '累计完成 7 次每日挑战', target: 7, xp: 100, icon: 'calendar', value: (s) => s.dailyChallenges },
     { id: 'weekly_1', title: '周挑战达成', desc: '完成 1 次每周挑战', target: 1, xp: 100, icon: 'flame', value: (s) => s.weeklyCompleted },

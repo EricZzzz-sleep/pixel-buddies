@@ -129,8 +129,13 @@ def chord_semis(sym):
     return [MAJOR[x % 7] + 12 * (x // 7) for x in degs]
 
 
+PENTA = [0, 2, 4, 7, 9]  # 五声音阶（宫商角徵羽），生肖系列用
+SCALE = MAJOR  # 旋律用的音阶；render_theme 按主题切换
+
+
 def deg_semi(d):
-    return MAJOR[d % 7] + 12 * (d // 7)
+    n = len(SCALE)
+    return SCALE[d % n] + 12 * (d // n)
 
 
 R44 = [[2, 2, 2, 2], [3, 1, 2, 2], [2, 1, 1, 4], [1, 1, 2, 4], [4, 2, 2], [2, 2, 4], [3, 3, 2],
@@ -213,7 +218,7 @@ def gen_melody(prog, rng, lo, hi, lib, start):
     # 乐句结尾回到主音
     if notes:
         last = notes[-1]
-        best = min((c for c in range(lo, hi + 1) if c % 7 == 0), key=lambda c: abs(c - last[1]))
+        best = min((c for c in range(lo, hi + 1) if c % len(SCALE) == 0), key=lambda c: abs(c - last[1]))
         last[1] = best
     return notes
 
@@ -259,6 +264,43 @@ THEMES = [
     dict(id='beach_sunset', title='落日口袋', key='A', bpm=76, meter=4, style='lofi', leadA='vibe', leadB='flute', swing=0.6,
          A=['I7', 'IV7', 'vi7', 'V7', 'I7', 'IV7', 'ii7', 'V7'], B=['vi7', 'IV7', 'I7', 'V7', 'vi7', 'IV7', 'bVII', 'V7'],
          C=['IV7', 'IV7', 'I7', 'I7', 'ii7', 'ii7', 'V7', 'V7'], amb='waves', seed=304),
+    # 十二生肖（五声音阶）
+    dict(id='zodiac_rat', title='数铜钱', key='D', bpm=108, meter=4, style='folk', scale='penta', leadA='flute', leadB='bell',
+         A=['I', 'vi', 'IV', 'V', 'I', 'vi', 'ii', 'V'], B=['IV', 'V', 'iii', 'vi', 'IV', 'V', 'I', 'I'],
+         C=['vi', 'vi', 'IV', 'IV', 'ii', 'ii', 'V', 'V'], amb=None, seed=401),
+    dict(id='zodiac_ox', title='田埂慢歌', key='F', bpm=84, meter=4, style='folk', scale='penta', leadA='flute', leadB='marimba',
+         A=['I', 'IV', 'I', 'V', 'vi', 'IV', 'V', 'I'], B=['vi', 'iii', 'IV', 'I', 'ii', 'V', 'I', 'I'],
+         C=['IV', 'IV', 'I', 'I', 'ii', 'ii', 'V', 'V'], amb='birds', seed=402),
+    dict(id='zodiac_tiger', title='竹林巡山', key='A', bpm=112, meter=4, style='marimba', scale='penta', leadA='marimba', leadB='flute',
+         A=['vi', 'IV', 'I', 'V', 'vi', 'IV', 'V', 'V'], B=['IV', 'V', 'iii', 'vi', 'IV', 'V', 'I', 'I'],
+         C=['vi', 'vi', 'IV', 'IV', 'ii', 'ii', 'V', 'V'], amb='birds', seed=403),
+    dict(id='zodiac_rabbit', title='月饼与月亮', key='Eb', bpm=66, meter=4, style='ambient', scale='penta', leadA='musicbox', leadB='bell',
+         A=['I', 'vi', 'IV', 'V', 'I', 'iii', 'IV', 'V'], B=['vi', 'IV', 'I', 'V', 'vi', 'IV', 'V', 'V'],
+         C=['IV', 'IV', 'I', 'I', 'IV', 'IV', 'V', 'V'], amb=None, seed=404),
+    dict(id='zodiac_dragon', title='云上龙珠', key='C', bpm=120, meter=4, style='chip', scale='penta', leadA='pulse', leadB='pulse_thin',
+         A=['I', 'V', 'vi', 'IV', 'I', 'V', 'IV', 'V'], B=['IV', 'V', 'iii', 'vi', 'IV', 'V', 'I', 'I'],
+         C=['vi', 'vi', 'IV', 'IV', 'ii', 'ii', 'V', 'V'], amb=None, seed=405),
+    dict(id='zodiac_snake', title='花间午睡', key='G', bpm=80, meter=4, style='bossa', scale='penta', leadA='flute', leadB='vibe', swing=0.56,
+         A=['I7', 'vi7', 'ii7', 'V7', 'I7', 'vi7', 'ii7', 'V7'], B=['IV7', 'iii7', 'vi7', 'ii7', 'IV7', 'iii7', 'ii7', 'V7'],
+         C=['IV7', 'IV7', 'iii7', 'iii7', 'ii7', 'ii7', 'V7', 'V7'], amb=None, seed=406),
+    dict(id='zodiac_horse', title='马蹄轻轻', key='D', bpm=126, meter=4, style='chip', scale='penta', leadA='pulse_thin', leadB='pulse',
+         A=['I', 'IV', 'V', 'I', 'vi', 'IV', 'V', 'I'], B=['vi', 'IV', 'I', 'V', 'vi', 'IV', 'ii', 'V'],
+         C=['IV', 'V', 'iii', 'vi', 'ii', 'ii', 'V', 'V'], amb=None, seed=407),
+    dict(id='zodiac_goat', title='云朵牧场', key='F', bpm=96, meter=3, style='musicbox', scale='penta', leadA='musicbox', leadB='bell',
+         A=['I', 'vi', 'IV', 'V', 'I', 'vi', 'ii', 'V'], B=['IV', 'V', 'iii', 'vi', 'ii', 'V', 'I', 'I'],
+         C=['vi', 'vi', 'IV', 'IV', 'ii', 'ii', 'V', 'V'], amb=None, seed=408),
+    dict(id='zodiac_monkey', title='偷桃记', key='G', bpm=118, meter=4, style='marimba', scale='penta', leadA='marimba', leadB='flute',
+         A=['I', 'IV', 'V', 'I', 'vi', 'IV', 'V', 'I'], B=['IV', 'I', 'V', 'vi', 'IV', 'I', 'ii', 'V'],
+         C=['vi', 'iii', 'IV', 'I', 'ii', 'ii', 'V', 'V'], amb='birds', seed=409),
+    dict(id='zodiac_rooster', title='第一声早安', key='A', bpm=100, meter=4, style='folk', scale='penta', leadA='flute', leadB='marimba',
+         A=['I', 'IV', 'I', 'V', 'vi', 'IV', 'V', 'I'], B=['IV', 'V', 'iii', 'vi', 'IV', 'V', 'I', 'I'],
+         C=['vi', 'vi', 'IV', 'IV', 'ii', 'ii', 'V', 'V'], amb='birds', seed=410),
+    dict(id='zodiac_dog', title='红围巾', key='Bb', bpm=78, meter=4, style='lofi', scale='penta', leadA='vibe', leadB='ep', swing=0.6,
+         A=['I7', 'vi7', 'ii7', 'V7', 'I7', 'vi7', 'ii7', 'V7'], B=['IV7', 'iii7', 'ii7', 'V7', 'IV7', 'V7', 'iii7', 'vi7'],
+         C=['IV7', 'IV7', 'iii7', 'vi7', 'ii7', 'ii7', 'V7', 'V7'], amb=None, seed=411),
+    dict(id='zodiac_pig', title='元宝滚滚', key='F', bpm=116, meter=4, style='chip', scale='penta', leadA='pulse', leadB='pulse_thin',
+         A=['I', 'vi', 'IV', 'V', 'I', 'vi', 'IV', 'V'], B=['IV', 'I', 'V', 'vi', 'IV', 'I', 'ii', 'V'],
+         C=['vi', 'IV', 'I', 'V', 'vi', 'IV', 'V', 'V'], amb=None, seed=412),
 ]
 
 
@@ -293,8 +335,9 @@ def voicing(semis, tonic):
 
 
 def render_theme(th, target=TARGET_SECONDS):
-    global R
+    global R, SCALE
     R = np.random.default_rng(th['seed'])
+    SCALE = PENTA if th.get('scale') == 'penta' else MAJOR
     gm.rng = np.random.default_rng(th['seed'] + 7)
     meter, style = th['meter'], th['style']
     tonic = KEYS[th['key']]
@@ -316,6 +359,8 @@ def render_theme(th, target=TARGET_SECONDS):
              'intro': Prog(th['A'][:4], meter), 'outro': Prog(['IV', 'V', 'I', 'I'] if meter == 4 else ['IV', 'V', 'I', 'I'], meter)}
     lib = (R34_SLOW if slow else R34) if meter == 3 else (R44_SLOW if slow else R44)
     lo, hi = (0, 9) if style != 'chip' else (2, 11)
+    if SCALE is PENTA:  # 五声音阶一个八度只有 5 个音，范围相应收窄
+        lo, hi = (0, 7) if style != 'chip' else (2, 9)
     melA = gen_melody(progs['A'], R, lo, hi, lib, start=4)
     melB = gen_melody(progs['B'], R, lo + 1, hi + 1, lib, start=6)
 
@@ -336,7 +381,7 @@ def render_theme(th, target=TARGET_SECONDS):
         # ---------------- 旋律
         if lead:
             mel, kind = lead
-            up = 1 if (name == 'A3' and style not in ('chip',)) and max(n[1] for n in mel) <= 6 else 0
+            up = 1 if (name == 'A3' and style not in ('chip',)) and max(n[1] for n in mel) < len(SCALE) else 0
             for bt, d, du in mel:
                 f = gm.hz(deg_midi(d, up))
                 s.put('lead', start_beat + bt, lead_note(kind, f, du * s.spb * 0.9, R.uniform(0.85, 1.0)),
@@ -486,7 +531,7 @@ def drum_bar(s, style, beat, meter, sw, bar, sec):
         s.put('drums', beat, gm.kick(0.35, soft=True))
 
 
-def export(y, path_noext, kbps=48):
+def export(y, path_noext, kbps=40):
     from scipy.io import wavfile
     wav = path_noext + '.wav'
     wavfile.write(wav, SR, (y * 32767).astype(np.int16))

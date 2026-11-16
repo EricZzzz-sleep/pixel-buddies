@@ -1,0 +1,14 @@
+{
+  "ver": "1.2.0",
+  "importer": "directory",
+  "imported": true,
+  "uuid": "d509bc90-2768-4ef3-9584-4d0bfd7207f5",
+  "files": [],
+  "subMetas": {},
+  "userData": {
+    "isBundle": true,
+    "bundleConfigID": "pb_music_remote_cfg",
+    "bundleName": "music_zodiac",
+    "priority": 1
+  }
+}

@@ -8,6 +8,7 @@ import {
     FOCUS_BGM,
     MENU_PLAYLIST,
     MENU_PLAYLIST_ID,
+    MUSIC_BUNDLE as MUSIC_BUNDLE_NAME,
     MusicContext,
     pickBgm,
     playlistTracks,
@@ -35,7 +36,7 @@ test('音乐目录：每首曲目在所属分包里都有 mp3 与 .meta，分包
     }
 });
 
-test('主题曲：12 张内置作品每张都有自己的主题曲，放在所属系列的分包里', () => {
+test('主题曲：每张内置作品都有自己的主题曲，放在所属系列的分包里', () => {
     for (const art of ART_LIST) {
         const id = themeOf(art.id);
         assert.ok(id, `${art.id} 没有主题曲`);
@@ -77,4 +78,19 @@ test('选曲：系列页播放该系列主题曲，返回时（无参数）记�
     assert.equal(pickBgm('series', { id: 'animals' }, ctx), 'pinkhaze');
     assert.equal(pickBgm('series', undefined, ctx), 'pinkhaze');
     assert.equal(pickBgm('series', { id: 'daily' }, ctx), 'cabin');
+});
+
+test('包体：菜单歌单是本地小游戏分包，主题曲分包在小游戏上走远程，构建配置填好了资源服务器', () => {
+    const builder = JSON.parse(fs.readFileSync(path.join(ASSETS, '..', 'settings', 'v2', 'packages', 'builder.json'), 'utf8'));
+    const cfg = (id: string) => builder.bundleConfig.custom[id].configs.miniGame.preferredOptions;
+    assert.deepEqual(cfg('pb_music_cfg'), { isRemote: false, compressionType: 'subpackage' });
+    assert.equal(cfg('pb_music_remote_cfg').isRemote, true);
+    const metaOf = (b: string) => JSON.parse(fs.readFileSync(path.join(ASSETS, `${b}.meta`), 'utf8')).userData.bundleConfigID;
+    assert.equal(metaOf(MUSIC_BUNDLE_NAME), 'pb_music_cfg', '没网时菜单也有音乐');
+    for (const b of Object.values(THEME_BUNDLES)) assert.equal(metaOf(b), 'pb_music_remote_cfg', `${b} 应为远程分包`);
+    for (const p of ['wechatgame', 'bytedance-mini-game']) {
+        const c = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'build-configs', `${p}.release.json`), 'utf8'));
+        assert.equal(c.server, `https://pixel-buddies.vercel.app/mini/${p}/`);
+        assert.equal(c.md5Cache, true, '远程文件名带哈希，才能长缓存且更新不串版本');
+    }
 });
