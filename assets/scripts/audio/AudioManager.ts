@@ -29,6 +29,7 @@ const PLAYLIST_FADE_OUT = 1.5;
  * - 背景音乐按页面/作品切换（选曲规则见 MusicCatalog），换曲时淡出淡入；
  *   曲目放在几个音乐分包里，用到哪个才下载哪个；菜单页是歌单轮播；
  * - 开关状态来自存档设置；进入后台暂停音乐，回到前台按设置恢复；
+ * - 只缓存正在播放的那首背景音乐，换曲后释放上一首（网页版整首解码进内存）；
  * - 同一音效 50ms 内不重复播放，避免连击时爆音、也节省低端机开销。
  */
 export class AudioManager {
@@ -247,6 +248,7 @@ export class AudioManager {
         }
         const audible = this.musicReady && this.musicSource.playing;
         const swap = () => {
+            const prevKey = this.currentKey;
             this.currentKey = key;
             this.targetVolume = key === FALLBACK_KEY ? FALLBACK_VOLUME : MUSIC_VOLUME;
             try {
@@ -256,6 +258,8 @@ export class AudioManager {
                 console.warn('[Audio] 切换音乐失败', e);
             }
             this.musicReady = true;
+            // 网页版用 Web Audio 时整首曲子会解码进内存（2:40 约 30MB），换曲后释放上一首，避免手机浏览器内存吃紧
+            if (prevKey && prevKey !== key) this.releaseClip(prevKey);
             this.fade.v = 0;
             this.setVolume();
             this.applyMusic();
@@ -263,6 +267,18 @@ export class AudioManager {
         };
         if (audible) this.fadeTo(0, fadeOut, swap);
         else swap();
+    }
+
+    private releaseClip(key: string): void {
+        if (key === FALLBACK_KEY) return; // 保底曲目很小，留着
+        const clip = this.musicClips.get(key);
+        if (!clip || clip === this.musicSource.clip) return;
+        this.musicClips.delete(key);
+        try {
+            assetManager.releaseAsset(clip);
+        } catch (e) {
+            console.warn('[Audio] 释放音乐失败', e);
+        }
     }
 
     private fadeTo(v: number, duration: number, done?: () => void): void {
