@@ -83,6 +83,9 @@ test('Vercel：缓存规则转成 vercel.json，顺序不变，/api 改写到 50
     const effect = cfg.headers.find((h: { source: string }) => h.source === '/play/src/effect.bin');
     assert.match(effect.headers[0].value, /must-revalidate/);
     assert.deepEqual(cfg.rewrites, [{ source: '/api/(.*)', destination: '/api/unavailable' }]);
+    // /play → /play/ 的跳转不能和 trailingSlash:false 同时存在，否则死循环
+    assert.deepEqual(cfg.redirects, [{ source: '/play', destination: '/play/', permanent: false }]);
+    assert.ok(!('trailingSlash' in cfg) || cfg.trailingSlash !== false);
 });
 
 test('Vercel：vercel-config 在 dist 上写出 vercel.json 与 /api 占位函数', () => {
@@ -98,4 +101,5 @@ test('Vercel：vercel-config 在 dist 上写出 vercel.json 与 /api 占位函�
     const cfg = JSON.parse(readFileSync(join(dist, 'vercel.json'), 'utf8'));
     assert.ok(cfg.headers.some((h: { source: string }) => h.source === '/play/index.abcde.js'));
     assert.match(readFileSync(join(dist, 'api', 'unavailable.js'), 'utf8'), /503/);
+    assert.match(readFileSync(join(dist, '.vercelignore'), 'utf8'), /\.env\*/);
 });
