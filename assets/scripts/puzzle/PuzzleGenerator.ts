@@ -33,13 +33,22 @@ export interface PuzzleLayout extends PuzzleSpec {
     order: number[];
 }
 
-export function generateLayout(spec: PuzzleSpec): PuzzleLayout {
+/**
+ * @param fixedCells 不参与打乱的格子（与其他格子像素完全相同的方块，见 identicalTileCells）。
+ *   由作品画面决定，因此好友挑战/每日挑战两端算出的结果一致。
+ */
+export function generateLayout(spec: PuzzleSpec, fixedCells: readonly number[] = []): PuzzleLayout {
     if (!isGridSize(spec.grid)) throw new Error(`不支持的网格：${spec.grid}`);
     if (!spec.imageId) throw new Error('缺少图片 ID');
     const n = spec.grid * spec.grid;
     const rng = new SeededRandom(spec.seed >>> 0);
-    const swaps = Math.max(1, Math.min(maxSwaps(spec.grid), spec.swaps ?? DIFFICULTIES[spec.grid].swaps));
-    const order = shuffleOrder(n, rng, swaps);
+    const fixed = fixedCells.filter((c) => c >= 0 && c < n);
+    const free = n - new Set(fixed).size;
+    const want = Math.max(1, Math.min(maxSwaps(spec.grid), spec.swaps ?? DIFFICULTIES[spec.grid].swaps));
+    // 可打乱的格子不够时少换几次；连一次都换不了（几乎纯色的作品）就退回普通打乱，保证总能出题
+    const useFixed = free >= 2;
+    const swaps = useFixed ? Math.min(want, Math.floor(free / 2)) : want;
+    const order = shuffleOrder(n, rng, swaps, useFixed ? fixed : []);
     return { imageId: spec.imageId, grid: spec.grid, seed: spec.seed >>> 0, swaps, order };
 }
 

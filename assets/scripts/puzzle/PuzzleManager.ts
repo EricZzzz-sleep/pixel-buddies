@@ -41,9 +41,10 @@ export class PuzzleManager {
     private _finished = false;
     private undoStack: Array<[number, number]> = [];
 
-    constructor(spec: PuzzleSpec, clock: Clock = defaultClock) {
+    /** @param fixedCells 不参与打乱的格子（与其他格子长得一模一样的方块），见 identicalTileCells */
+    constructor(spec: PuzzleSpec, clock: Clock = defaultClock, fixedCells: readonly number[] = []) {
         this.spec = spec;
-        this.layout = generateLayout(spec);
+        this.layout = generateLayout(spec, fixedCells);
         this.n = spec.grid * spec.grid;
         this.order = this.layout.order.slice();
         this.optimalMoves = minSwapsToSolve(this.order);

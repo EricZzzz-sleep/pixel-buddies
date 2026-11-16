@@ -48,16 +48,21 @@ export class TextureFactory {
         return sf;
     }
 
+    /** 作品的原始像素（工坊作品走 customProvider），用于切图以外的逻辑，例如找出长得一样的方块 */
+    artCanvas(id: string): PixelCanvas {
+        if (isCustomId(id) && this.customProvider) {
+            const c = this.customProvider(id);
+            if (c) return c;
+        }
+        return renderArt(id);
+    }
+
     /** 完整作品 */
     art(id: string): SpriteFrame {
         const key = `art:${id}`;
         const cached = this.frames.get(key);
         if (cached) return cached;
-        if (isCustomId(id) && this.customProvider) {
-            const c = this.customProvider(id);
-            if (c) return this.frameFromCanvas(key, c);
-        }
-        return this.frameFromCanvas(key, renderArt(id));
+        return this.frameFromCanvas(key, this.artCanvas(id));
     }
 
     /** 未收集作品的马赛克预览 */

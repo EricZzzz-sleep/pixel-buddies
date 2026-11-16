@@ -283,18 +283,27 @@ export { makeNode };
 export function segmentBar(parent: Node, total: number, filled: number, w: number, h: number, color: number, x = 0, y = 0): Node {
     const n = makeNode('Segments', parent, w, h, x, y);
     const g = n.addComponent(Graphics);
-    const gap = 6;
-    const sw = (w - gap * (total - 1)) / total;
-    for (let i = 0; i < total; i++) {
-        g.fillColor = hex(i < filled ? color : P.cream3);
-        g.rect(-w / 2 + i * (sw + gap), -h / 2, sw, h);
+    const count = Math.max(1, total | 0);
+    const done = Math.max(0, Math.min(count, filled));
+    // 作品越来越多时格子会变得很细：缝隙按比例缩小，每格窄于 6 像素就改画成一根连续进度条
+    const gap = Math.min(6, (w / count) * 0.25);
+    const sw = (w - gap * (count - 1)) / count;
+    const bar = (bx: number, bw: number, on: boolean) => {
+        g.fillColor = hex(on ? color : P.cream3);
+        g.rect(bx, -h / 2, bw, h);
         g.fill();
-        if (i < filled) {
+        if (on) {
             g.fillColor = hex(P.white, 110);
-            g.rect(-w / 2 + i * (sw + gap), h / 2 - h * 0.3, sw, h * 0.3);
+            g.rect(bx, h / 2 - h * 0.3, bw, h * 0.3);
             g.fill();
         }
+    };
+    if (sw < 6) {
+        bar(-w / 2, w, false);
+        if (done > 0) bar(-w / 2, (w * done) / count, true);
+        return n;
     }
+    for (let i = 0; i < count; i++) bar(-w / 2 + i * (sw + gap), sw, i < done);
     return n;
 }
 
