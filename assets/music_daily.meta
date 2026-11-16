@@ -7,7 +7,7 @@
   "subMetas": {},
   "userData": {
     "isBundle": true,
-    "bundleConfigID": "default",
+    "bundleConfigID": "pb_music_cfg",
     "bundleName": "music_daily",
     "priority": 1
   }
