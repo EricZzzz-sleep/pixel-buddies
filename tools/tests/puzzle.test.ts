@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { generateLayout, buildPieces, pieceSourceRect } from '../../assets/scripts/puzzle/PuzzleGenerator';
 import { isPermutation, isSolved, countFixedPoints, minSwapsToSolve } from '../../assets/scripts/puzzle/PuzzleValidator';
 import { PuzzleManager } from '../../assets/scripts/puzzle/PuzzleManager';
-import { computeStars, isBetterRecord } from '../../assets/scripts/puzzle/PuzzleScoring';
+import { computeStars, isBetterRecord, movesHudText } from '../../assets/scripts/puzzle/PuzzleScoring';
 import { GridSize } from '../../assets/scripts/config/GameConfig';
 import { SeededRandom } from '../../assets/scripts/core/Random';
 import { shuffleOrder } from '../../assets/scripts/puzzle/PuzzleShuffle';
@@ -258,4 +258,15 @@ test('最少交换步数计算', () => {
     assert.equal(minSwapsToSolve([0, 1, 2, 3]), 0);
     assert.equal(minSwapsToSolve([1, 0, 3, 2]), 2);
     assert.equal(minSwapsToSolve([1, 2, 3, 0]), 3);
+});
+
+test('步数显示：先三星上限，超过换二星上限，再超过只显示步数', () => {
+    const b = computeStars({ grid: 4, timeMs: 0, moves: 0, hintsUsed: 0, optimalMoves: 3 });
+    assert.equal(b.threeStarMoves, 4);
+    assert.equal(b.twoStarMoves, 6);
+    assert.equal(movesHudText(0, b), '0/4 步');
+    assert.equal(movesHudText(4, b), '4/4 步');
+    assert.equal(movesHudText(5, b), '5/6 步');
+    assert.equal(movesHudText(6, b), '6/6 步');
+    assert.equal(movesHudText(7, b), '7 步');
 });
