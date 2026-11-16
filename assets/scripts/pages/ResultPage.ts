@@ -126,8 +126,6 @@ export class ResultPage extends BasePage {
                 this.fx.ring(0, starY + 10, 180, 20);
                 this.fx.confetti(L.w, L.h / 2, -L.h / 2, 40);
             }).start();
-            const crown = sprite(c, gm.textures.icon('crown', P.gold, P.white), 66, 42, 0, starY + 82);
-            popIn(crown.node, 1.1);
         }
 
         // 数据面板
