@@ -83,6 +83,8 @@ test('Vercel：缓存规则转成 vercel.json，顺序不变，/api 改写到 50
     const effect = cfg.headers.find((h: { source: string }) => h.source === '/play/src/effect.bin');
     assert.match(effect.headers[0].value, /must-revalidate/);
     assert.deepEqual(cfg.rewrites, [{ source: '/api/(.*)', destination: '/api/unavailable' }]);
+    const mini = cfg.headers.find((h: { source: string }) => h.source === '/mini/(.*)');
+    assert.match(mini.headers[0].value, /immutable/, '小游戏远程分包长缓存');
     // /play → /play/ 的跳转不能和 trailingSlash:false 同时存在，否则死循环
     assert.deepEqual(cfg.redirects, [{ source: '/play', destination: '/play/', permanent: false }]);
     assert.ok(!('trailingSlash' in cfg) || cfg.trailingSlash !== false);

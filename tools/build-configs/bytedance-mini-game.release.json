@@ -8,7 +8,7 @@
     }
   ],
   "buildPath": "project://build",
-  "md5Cache": false,
+  "md5Cache": true,
   "sourceMaps": false,
   "platform": "bytedance-mini-game",
   "outputName": "bytedance-mini-game",
@@ -17,5 +17,6 @@
       "appid": "tt_YOUR_DOUYIN_APPID",
       "orientation": "portrait"
     }
-  }
+  },
+  "server": "https://pixel-buddies.vercel.app/mini/bytedance-mini-game/"
 }

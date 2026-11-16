@@ -45,10 +45,10 @@
 
 - 结构：前奏 → A → B → A′（加三度和声）→ 桥段（抽掉鼓和旋律）→ A″ → … → 尾声，可无缝循环。
 - 旋律用“动机 + 模进”算法生成（固定随机种子，可复现），强拍落在和弦音上，乐句结尾回到主音。速度做了微调，让每首都是 161.75 秒（与 Pink Haze 等长）。
-- 单声道 48kbps，每首约 0.95MB，每个系列分包约 3.9MB；响度统一为约 -16 LUFS。
+- 单声道 40kbps，每首约 0.8MB，每个 4 首的系列分包约 3.2MB；响度统一为约 -16 LUFS。
 - 生肖系列的旋律用**五声音阶**（宫商角徵羽，`scale='penta'`），和弦不变，听起来更有中国风。
-- 按系列拆成分包（每个约 3.8MB，生肖约 11.4MB）：玩到哪个系列才下载哪个。
-- ⚠️ 微信小游戏**整包（主包 + 全部分包）上限 30MB**。加入生肖后约 28MB，已接近上限；再加系列需要把音乐分包改为远程加载（或降低码率）。
+- 按系列拆成分包（生肖约 9.6MB）：玩到哪个系列才下载哪个。
+- 小游戏上主题曲分包是**远程分包**，不计入微信 30MB 整包上限，见下方“小游戏远程音乐”。
 
 ## 哪里放哪首（`assets/scripts/audio/MusicCatalog.ts`）
 
@@ -62,15 +62,26 @@
 
 换曲时淡出 0.35 秒、淡入 0.6 秒；同一首正在播放时不会重新开始。分包加载失败时自动改用主包里的 `assets/resources/audio/bgm.mp3`。对应关系的测试在 `tools/tests/music.test.ts`。
 
-## ⚠️ 必须设置：4 个音乐分包
+## 分包配置（Bundle 配置）
 
-所有音乐分包（`assets/music`、`music_animals`、`music_sweets`、`music_daily`、`music_zodiac`）都使用自定义 Bundle 配置 `pb_music_cfg`（微信/抖音为小游戏分包）。新加音乐分包时，`.meta` 里的 `bundleConfigID` 也要设为 `pb_music_cfg`。如需手动检查，对每个文件夹：
+| 分包 | Bundle 配置 | 微信/抖音小游戏上 |
+|---|---|---|
+| `assets/music`（菜单歌单，2.7MB） | `pb_music_cfg` | 本地小游戏分包：没网时菜单也有音乐 |
+| `music_animals` / `music_sweets` / `music_daily` / `music_zodiac`（主题曲，约 18MB） | `pb_music_remote_cfg` | **远程分包**：不打进小游戏包，从网站下载 |
 
-1. 在资源管理器中选中文件夹；
-2. 属性检查器 → Bundle 配置 → 在 **微信小游戏** 和 **抖音小游戏** 平台把 **压缩类型** 设为 **小游戏分包（Mini Game Subpackage）**；
-3. 点击“应用”。
+两个配置都在 `settings/v2/packages/builder.json`。新加主题曲分包时，`.meta` 的 `bundleConfigID` 设为 `pb_music_remote_cfg`；`tools/tests/music.test.ts` 会检查。网页版不受影响，所有分包都随网页一起部署。
 
-然后重新构建，确认 `game.json` 里有这 4 个分包、主包仍在 4MB 以内。分包合计约 14.4MB，在微信小游戏总包上限以内。Web 构建不需要改。
+## 小游戏远程音乐
+
+微信小游戏规定主包不超过 4M、所有包合计不超过 30M。主题曲越来越多，所以改为远程加载：
+
+- 构建配置 `tools/build-configs/wechatgame.release.json`、`bytedance-mini-game.release.json` 的资源服务器地址（`server`）是 `https://pixel-buddies.vercel.app/mini/<平台>/`，并开启 `md5Cache`（文件名带哈希，可长缓存，更新不串版本）。
+- `npm run web:vercel` 会同时构建网页版和两个小游戏，把 `build/<平台>/remote/` 复制到 `dist/mini/<平台>/remote/`，和网页一起部署到 Vercel。**每次部署都会带上**，否则已发布的小游戏会找不到音乐（只想发网页版可设 `MINI_PLATFORMS=` 跳过，但不要在小游戏已上线后这么做）。
+- 上传小游戏用的是同一次构建的 `build/wechatgame`、`build/bytedance-mini-game`，保证哈希和网站上的一致。
+
+**上线前必须做：**
+1. 微信公众平台 → 开发管理 → 服务器域名 → **downloadFile 合法域名** 加上 `https://pixel-buddies.vercel.app`；抖音开发者后台同样把它加入下载域名白名单。否则真机上主题曲会加载失败（游戏会自动改放主包里的保底音乐，不会崩溃）。
+2. `*.vercel.app` 在中国大陆的访问速度和稳定性需要真机实测。如果不理想，换成自己的域名（按平台要求完成备案和 HTTPS），再改上面两个构建配置里的 `server`。
 
 ## 重新生成 / 修改
 

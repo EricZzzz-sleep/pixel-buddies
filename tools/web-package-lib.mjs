@@ -76,7 +76,11 @@ export function renderVercelJson(rules) {
         // 不要设 trailingSlash:false —— 它会把 /play/ 跳回 /play，和下面的跳转形成死循环
         redirects: [{ source: '/play', destination: '/play/', permanent: false }],
         rewrites: [{ source: '/api/(.*)', destination: '/api/unavailable' }],
-        headers: rules.map((r) => ({ source: esc(r.path), headers: r.set.map(([key, value]) => ({ key, value })) })),
+        headers: [
+            ...rules.map((r) => ({ source: esc(r.path), headers: r.set.map(([key, value]) => ({ key, value })) })),
+            // 小游戏远程分包（md5Cache 开启，文件名带哈希）：长缓存
+            { source: '/mini/(.*)', headers: [{ key: 'Cache-Control', value: IMMUTABLE }] },
+        ],
       },
       null,
       2,

@@ -8,7 +8,7 @@
     }
   ],
   "buildPath": "project://build",
-  "md5Cache": false,
+  "md5Cache": true,
   "sourceMaps": false,
   "platform": "wechatgame",
   "outputName": "wechatgame",
@@ -17,5 +17,6 @@
       "appid": "wx_YOUR_WECHAT_APPID",
       "orientation": "portrait"
     }
-  }
+  },
+  "server": "https://pixel-buddies.vercel.app/mini/wechatgame/"
 }

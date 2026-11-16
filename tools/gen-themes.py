@@ -531,7 +531,7 @@ def drum_bar(s, style, beat, meter, sw, bar, sec):
         s.put('drums', beat, gm.kick(0.35, soft=True))
 
 
-def export(y, path_noext, kbps=48):
+def export(y, path_noext, kbps=40):
     from scipy.io import wavfile
     wav = path_noext + '.wav'
     wavfile.write(wav, SR, (y * 32767).astype(np.int16))

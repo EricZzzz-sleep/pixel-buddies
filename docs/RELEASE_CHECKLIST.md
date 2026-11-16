@@ -7,7 +7,7 @@
 - 🟨 微信构建已通过；需注册小游戏、填写 AppID，并在开发者工具与真机上实测（测试报告 B）。
 - 🟨 抖音构建已通过；需注册小游戏、填写 AppID，并在开发者工具与真机上实测（测试报告 C）。
 - ✅ 功能裁剪完成，微信/抖音 release 包约 2.2MB。
-- 🟨 背景音乐（约 14.4MB）在 `assets/music`、`music_animals`、`music_sweets`、`music_daily` 四个 Bundle 中：在 Cocos Creator 里把它们的微信/抖音压缩类型设为“小游戏分包”，重新构建并确认主包仍小于 4MB（见 MUSIC.md）。
+- 🟨 背景音乐：菜单歌单是本地小游戏分包，主题曲分包是远程分包，部署在 `https://pixel-buddies.vercel.app/mini/<平台>/`。微信/抖音后台要把这个域名加入 downloadFile 合法域名，并真机确认能播放（见 MUSIC.md）。
 - 🟨 `pink_haze.mp3`（Pink Haze）是作者录音：确认曲子为自己创作，或已取得曲作者授权。
 - 🟨 游戏内《隐私政策》《用户协议》已完成（模板）：发布前替换【开发者名称】【联系邮箱】，并在微信/抖音后台配置隐私保护指引（相册用途）。
 - 🟨 图标已生成（`docs/store-assets/icon_512.png`、`icon_144.png`），微信默认分享图已打进包内；平台后台的宣传截图可以直接用 `docs/screenshots/`。启动页目前仍是 Cocos 默认样式。
