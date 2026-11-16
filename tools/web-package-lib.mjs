@@ -60,3 +60,33 @@ export function renderHeaders(rules) {
       .join('\n\n') + '\n'
   );
 }
+
+/**
+ * 把同一套缓存规则转成 Vercel 的 vercel.json。
+ * Vercel 对同一路径命中的多条规则按顺序应用、同名头后者覆盖，所以“目录 immutable + 未哈希例外”的顺序与 _headers 一致即可。
+ * Vercel 托管时没有 Cloudflare D1 后端：/api/* 统一改写到一个返回 503 的函数，游戏会按“后端未开通”处理。
+ */
+export function renderVercelJson(rules) {
+  const esc = (p) => p.replace(/[()?+:]/g, (c) => `\\${c}`).replace(/\*/g, '(.*)');
+  return (
+    JSON.stringify(
+      {
+        $schema: 'https://openapi.vercel.sh/vercel.json',
+        cleanUrls: false,
+        trailingSlash: false,
+        redirects: [{ source: '/play', destination: '/play/', permanent: false }],
+        rewrites: [{ source: '/api/(.*)', destination: '/api/unavailable' }],
+        headers: rules.map((r) => ({ source: esc(r.path), headers: r.set.map(([key, value]) => ({ key, value })) })),
+      },
+      null,
+      2,
+    ) + '\n'
+  );
+}
+
+/** Vercel 上 /api/* 的占位函数：明确返回 503，统计静默丢弃、反馈提示未开通 */
+export const VERCEL_API_STUB = `export default function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(503).json({ error: 'backend_not_configured', message: 'Vercel 部署没有接入统计与反馈后端' });
+}
+`;
