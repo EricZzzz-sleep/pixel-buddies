@@ -13,6 +13,19 @@ export interface SwapOutcome {
     reason?: 'same-cell' | 'locked' | 'out-of-range' | 'finished';
 }
 
+/** 一局的规则（默认 = 普通模式） */
+export interface PuzzleRules {
+    /** 拼对的方块是否锁定；默认跟随 GAMEPLAY.lockCorrectPieces，地狱模式为 false */
+    lockCorrect?: boolean;
+    /** 是否允许使用提示；地狱模式为 false */
+    hints?: boolean;
+    /**
+     * looks[pieceId] = 长相编号（见 tileLooks）。提供时，按长相判断格子是否拼对：
+     * 长得一模一样的两块互换后画面不变，也算拼好。
+     */
+    looks?: readonly number[];
+}
+
 export interface HintInfo {
     /** 需要移动的方块当前所在格 */
     fromCell: number;
@@ -40,10 +53,16 @@ export class PuzzleManager {
     private _bonusHints = 0;
     private _finished = false;
     private undoStack: Array<[number, number]> = [];
+    private readonly lockCorrect: boolean;
+    private readonly hintsAllowed: boolean;
+    private readonly looks: readonly number[] | null;
 
     /** @param fixedCells 不参与打乱的格子（与其他格子长得一模一样的方块），见 identicalTileCells */
-    constructor(spec: PuzzleSpec, clock: Clock = defaultClock, fixedCells: readonly number[] = []) {
+    constructor(spec: PuzzleSpec, clock: Clock = defaultClock, fixedCells: readonly number[] = [], rules: PuzzleRules = {}) {
         this.spec = spec;
+        this.lockCorrect = rules.lockCorrect ?? GAMEPLAY.lockCorrectPieces;
+        this.hintsAllowed = rules.hints ?? true;
+        this.looks = rules.looks && rules.looks.length === spec.grid * spec.grid ? rules.looks : null;
         this.layout = generateLayout(spec, fixedCells);
         this.n = spec.grid * spec.grid;
         this.order = this.layout.order.slice();
@@ -61,6 +80,7 @@ export class PuzzleManager {
         return this._hintsUsed;
     }
     get hintsLeft(): number {
+        if (!this.hintsAllowed) return 0;
         return Math.max(0, DIFFICULTIES[this.spec.grid].freeHints + this._bonusHints - this._hintsUsed);
     }
     get peekCount(): number {
@@ -70,7 +90,15 @@ export class PuzzleManager {
         return this._finished;
     }
     get correctCount(): number {
-        return countCorrect(this.order);
+        if (!this.looks) return countCorrect(this.order);
+        let k = 0;
+        for (let c = 0; c < this.n; c++) if (this.isCellCorrect(c)) k++;
+        return k;
+    }
+
+    /** 是否允许使用提示（地狱模式不允许） */
+    get hintsEnabled(): boolean {
+        return this.hintsAllowed;
     }
     get canUndo(): boolean {
         return !this._finished && this.undoStack.length > 0;
@@ -81,7 +109,9 @@ export class PuzzleManager {
     }
 
     isCellCorrect(cell: number): boolean {
-        return this.order[cell] === cell;
+        const piece = this.order[cell];
+        if (piece === cell) return true;
+        return !!this.looks && this.looks[piece] === this.looks[cell];
     }
 
     /** 当前所有方块数据快照 */
@@ -92,7 +122,7 @@ export class PuzzleManager {
     /** 方块是否可被拿起（已归位的方块在配置开启时锁定） */
     canPick(cell: number): boolean {
         if (this._finished || cell < 0 || cell >= this.n) return false;
-        return !(GAMEPLAY.lockCorrectPieces && this.isCellCorrect(cell));
+        return !(this.lockCorrect && this.isCellCorrect(cell));
     }
 
     /** 玩家第一次有效操作（拿起方块/点选方块）时调用，开始计时 */
@@ -105,7 +135,7 @@ export class PuzzleManager {
         if (this._finished) return { ...none, reason: 'finished' };
         if (a < 0 || b < 0 || a >= this.n || b >= this.n) return { ...none, reason: 'out-of-range' };
         if (a === b) return { ...none, reason: 'same-cell' };
-        if (!this.canPick(a) || (GAMEPLAY.lockCorrectPieces && this.isCellCorrect(b))) return { ...none, reason: 'locked' };
+        if (!this.canPick(a) || (this.lockCorrect && this.isCellCorrect(b))) return { ...none, reason: 'locked' };
 
         this.timer.start();
         this.swapRaw(a, b);
@@ -117,7 +147,7 @@ export class PuzzleManager {
         if (this.isCellCorrect(a)) newly.push(a);
         if (this.isCellCorrect(b)) newly.push(b);
 
-        const solved = isSolved(this.order);
+        const solved = this.looks ? this.correctCount === this.n : isSolved(this.order);
         if (solved) {
             this._finished = true;
             this.timer.stop();

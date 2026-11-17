@@ -1,7 +1,7 @@
 import { DIFFICULTIES, GridSize, isGridSize, maxSwaps } from '../config/GameConfig';
 import { SeededRandom } from '../core/Random';
 import { shuffleOrder } from './PuzzleShuffle';
-import { isPermutation } from './PuzzleValidator';
+import { isPermutation, minSwapsToSolve } from './PuzzleValidator';
 
 /** 单个方块的核心数据 */
 export interface PieceData {
@@ -24,6 +24,8 @@ export interface PuzzleSpec {
     seed: number;
     /** 可选：覆盖难度配置的交换次数（仅新手渐进使用；挑战/每日不设置，保证两端布局一致） */
     swaps?: number;
+    /** 打乱方式：默认两两互换；'full' = 地狱模式，所有可打乱的方块都不在原位（随机错排） */
+    shuffle?: 'full';
 }
 
 export interface PuzzleLayout extends PuzzleSpec {
@@ -47,9 +49,42 @@ export function generateLayout(spec: PuzzleSpec, fixedCells: readonly number[] =
     const want = Math.max(1, Math.min(maxSwaps(spec.grid), spec.swaps ?? DIFFICULTIES[spec.grid].swaps));
     // 可打乱的格子不够时少换几次；连一次都换不了（几乎纯色的作品）就退回普通打乱，保证总能出题
     const useFixed = free >= 2;
+    if (spec.shuffle === 'full') {
+        const order = fullShuffle(n, rng, useFixed ? fixed : []);
+        return { imageId: spec.imageId, grid: spec.grid, seed: spec.seed >>> 0, swaps: minSwapsToSolve(order), order, shuffle: 'full' };
+    }
     const swaps = useFixed ? Math.min(want, Math.floor(free / 2)) : want;
     const order = shuffleOrder(n, rng, swaps, useFixed ? fixed : []);
     return { imageId: spec.imageId, grid: spec.grid, seed: spec.seed >>> 0, swaps, order };
+}
+
+/**
+ * 随机错排：fixed 以外的每一块都不在自己的位置上（Fisher-Yates 洗牌，有块留在原位就重洗）。
+ * 可打乱的块 ≥ 2 时一定能找到，平均约 2.7 次。
+ */
+export function fullShuffle(n: number, rng: SeededRandom, fixed: readonly number[] = []): number[] {
+    const skip = new Set(fixed);
+    const cells: number[] = [];
+    for (let i = 0; i < n; i++) if (!skip.has(i)) cells.push(i);
+    const order: number[] = [];
+    for (let i = 0; i < n; i++) order.push(i);
+    if (cells.length < 2) return order;
+    for (let attempt = 0; attempt < 200; attempt++) {
+        const pieces = cells.slice();
+        for (let i = pieces.length - 1; i > 0; i--) {
+            const j = rng.int(i + 1);
+            const t = pieces[i];
+            pieces[i] = pieces[j];
+            pieces[j] = t;
+        }
+        if (pieces.every((p, k) => p !== cells[k])) {
+            cells.forEach((c, k) => (order[c] = pieces[k]));
+            return order;
+        }
+    }
+    // 理论上不会走到：整体轮换一格，必然全部错位
+    cells.forEach((c, k) => (order[c] = cells[(k + 1) % cells.length]));
+    return order;
 }
 
 /** 由布局生成方块数据列表（按方块 ID 排序） */

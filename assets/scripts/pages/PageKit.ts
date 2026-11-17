@@ -2,7 +2,7 @@ import { Graphics, Label, Node, SpriteFrame } from 'cc';
 import { ArtCategory, ArtInfo, CATEGORY_LABEL, CATEGORY_ORDER, getArt } from '../art/ArtCatalog';
 import { SeriesInfo } from '../collection/SeriesCatalog';
 import { P } from '../art/Palette';
-import { beginnerSwaps, DIFFICULTIES, GridSize, misplacedCount, recommendedGrid, SUPPORTED_GRIDS } from '../config/GameConfig';
+import { beginnerSwaps, DIFFICULTIES, GridSize, HELL, misplacedCount, recommendedGrid, SUPPORTED_GRIDS } from '../config/GameConfig';
 import { formatDuration } from '../core/GameTimer';
 import { GameManager, PlaySession } from '../core/GameManager';
 import { randomSeed } from '../core/Random';
@@ -144,13 +144,16 @@ export function currentBeginnerSwaps(): number {
  * 难度选择弹窗：每一档都说明“几块放错、要换几次”，并显示迷你棋盘、个人最佳；
  * 根据玩家进度推荐一档（新手推荐入门 3×3）。
  */
-export function openDifficultySheet(art: ArtInfo, onPick: (grid: GridSize) => void, title = '选择难度'): void {
+export function openDifficultySheet(art: ArtInfo, onPick: (grid: GridSize) => void, title = '选择难度', opts: { hell?: boolean } = {}): void {
     const gm = GameManager.I;
     const sm = gm.scene;
     const w = Math.min(gm.layout.w - 40, 680);
-    const rowH = 158;
+    const withHell = opts.hell !== false;
+    const rows = SUPPORTED_GRIDS.length + (withHell ? 1 : 0);
     const headH = 250;
-    const h = headH + rowH * SUPPORTED_GRIDS.length + 56;
+    // 多了地狱模式一行：矮屏上整体压缩行高，弹窗不超出屏幕
+    const rowH = Math.max(124, Math.min(158, (gm.layout.h - 140 - headH - 56) / rows));
+    const h = headH + rowH * rows + 56;
     const rec = recommendedGrid(gm.save.data.totalCompletions);
     const card = sm.openModal(w, h);
     label(card, title, Theme.font.h2, { bold: true }).node.setPosition(0, h / 2 - 50);
@@ -190,6 +193,26 @@ export function openDifficultySheet(art: ArtInfo, onPick: (grid: GridSize) => vo
             onPick(g);
         });
     });
+    if (withHell) {
+        const y = h / 2 - headH - rowH / 2 - SUPPORTED_GRIDS.length * rowH + 10;
+        const row = panel(card, rw, rh, { fill: P.night2, border: P.ink, shadow: P.rose2, step: Theme.px, shadowDepth: 1.5 }, 0, y);
+        miniBoard(row, HELL.grid, HELL.grid * HELL.grid, Math.min(84, rh - 40), -rw / 2 + 70, 0);
+        label(row, `${HELL.label}  ${HELL.grid}×${HELL.grid}`, Theme.font.body, { bold: true, color: P.white, align: 'left', width: rw - 330 }).node.setPosition(-rw / 2 + 130, rh * 0.25);
+        label(row, HELL.desc, Theme.font.small - 2, { color: P.pink2, bold: true, align: 'left', width: rw - 330 }).node.setPosition(-rw / 2 + 130, 0);
+        label(row, '拼对没有提示音，拼完才结算', Theme.font.tiny, { color: P.cream3, align: 'left', width: rw - 330 }).node.setPosition(-rw / 2 + 130, -rh * 0.24);
+        const hr = gm.save.data.hell[art.id];
+        if (hr) {
+            label(row, `通关 ${hr.clears} 次`, Theme.font.tiny, { color: P.white, bold: true }).node.setPosition(rw / 2 - 90, 16);
+            label(row, `${formatDuration(hr.bestTimeMs)} · ${hr.bestMoves} 步`, Theme.font.tiny, { color: P.pink2, bold: true }).node.setPosition(rw / 2 - 90, -18);
+        } else {
+            sprite(row, gm.textures.icon('flame', P.rose, P.gold), 40, 40, rw / 2 - 90, 0);
+        }
+        onTap(row, () => {
+            gm.audio.play('click');
+            sm.closeModal();
+            Flow.hell(art.id);
+        });
+    }
     label(card, '轻点空白处关闭', Theme.font.tiny, { color: Theme.textMuted }).node.setPosition(0, -h / 2 + 28);
 }
 
@@ -203,6 +226,11 @@ export const Flow = {
             if (s !== null) spec.swaps = s;
         }
         GameManager.I.scene.go('game', { mode: 'classic', spec } as PlaySession);
+    },
+    /** 地狱模式：5×5、全部打乱，见 HELL */
+    hell(imageId: string): void {
+        const spec: PlaySession['spec'] = { imageId, grid: HELL.grid, seed: randomSeed(), shuffle: 'full' };
+        GameManager.I.scene.go('game', { mode: 'hell', spec } as PlaySession);
     },
     daily(): void {
         const gm = GameManager.I;

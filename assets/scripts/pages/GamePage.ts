@@ -1,11 +1,11 @@
 import { BlockInputEvents, Graphics, Label, Node, Sprite, tween, Tween, UITransform, Vec3 } from 'cc';
 import { P } from '../art/Palette';
-import { CHALLENGE, DIFFICULTIES } from '../config/GameConfig';
+import { CHALLENGE, DIFFICULTIES, HELL } from '../config/GameConfig';
 import { formatDuration } from '../core/GameTimer';
 import { PlaySession, ResultPayload } from '../core/GameManager';
 import { PuzzleBoard } from '../puzzle/PuzzleBoard';
 import { BEGINNER_GRID } from '../config/GameConfig';
-import { identicalTileCells } from '../puzzle/TileSignature';
+import { identicalTileCells, tileLooks } from '../puzzle/TileSignature';
 import { PuzzleManager, SwapOutcome } from '../puzzle/PuzzleManager';
 import { computeStars, movesHudText } from '../puzzle/PuzzleScoring';
 import { Effects } from '../ui/Effects';
@@ -20,6 +20,7 @@ const MODE_TAG: Record<PlaySession['mode'], string> = {
     daily: '每日挑战',
     'challenge-create': '发起挑战',
     'challenge-accept': '好友挑战',
+    hell: '地狱模式',
 };
 
 /**
@@ -38,6 +39,9 @@ export class GamePage extends BasePage {
     private progressLabel!: Label;
     private progressBar!: Graphics;
     private progressW = 0;
+    private progressNode!: Node;
+    /** 本局是否地狱模式：拼对无反馈、不锁定、无提示、不显示限制 */
+    private hell = false;
     private hintBtn!: ButtonHandle;
     private undoBtn!: ButtonHandle;
     private peekBtn!: ButtonHandle;
@@ -119,6 +123,7 @@ export class GamePage extends BasePage {
         this.progressLabel = label(this.root, '', Theme.font.tiny, { color: P.ink2, bold: true, align: 'left' });
         this.progressLabel.node.setPosition(-W / 2, progY + 22);
         const bar = makeNode('Progress', this.root, W, 16, 0, progY);
+        this.progressNode = bar;
         this.progressBar = bar.addComponent(Graphics);
 
         // 棋盘：在 HUD 与进度条之间取最大正方形
@@ -155,13 +160,18 @@ export class GamePage extends BasePage {
         const legacy = !!session.challenge && session.challenge.version < CHALLENGE.identicalTilesFromVersion;
         const canvas = gm.textures.artCanvas(session.spec.imageId);
         const fixed = legacy ? [] : identicalTileCells(canvas.data, canvas.w, session.spec.grid);
-        this.pm = new PuzzleManager(session.spec, undefined, fixed);
+        this.hell = session.mode === 'hell';
+        // 地狱模式：拼对不锁定、不给提示；按长相判断是否拼好（两块一模一样的方块互换也算对）
+        const rules = this.hell ? { lockCorrect: false, hints: false, looks: tileLooks(canvas.data, canvas.w, session.spec.grid) } : {};
+        this.pm = new PuzzleManager(session.spec, undefined, fixed, rules);
         this.board.start(this.pm);
         this.board.setEnabled(true);
         const art = this.gm.resolveArt(session.spec.imageId);
         this.titleLabel.string = art ? art.name : '像素拼图';
         const d = DIFFICULTIES[session.spec.grid];
-        this.tagLabel.string = `${MODE_TAG[session.mode]} · ${d.label} ${d.desc}`;
+        this.tagLabel.string = this.hell ? `${MODE_TAG.hell} · ${session.spec.grid}×${session.spec.grid} ${HELL.desc}` : `${MODE_TAG[session.mode]} · ${d.label} ${d.desc}`;
+        this.progressNode.active = !this.hell;
+        this.hintBtn.setEnabled(!this.hell);
         const firstEver = gm.save.data.totalPlays === 0;
         gm.collection.recordPlayStarted();
         if (firstEver) gm.analytics.track('first_game_started', { mode: session.mode, grid: session.spec.grid });
@@ -173,7 +183,7 @@ export class GamePage extends BasePage {
         this.refreshHud(true);
         // 教程：只在玩家还没学过时出现，且只出现在入门拼图或玩家的第一局
         const first = gm.save.data.totalCompletions === 0;
-        if (!gm.save.data.tutorial.puzzleBasics && (session.spec.grid === BEGINNER_GRID || first)) this.startTutorial();
+        if (!this.hell && !gm.save.data.tutorial.puzzleBasics && (session.spec.grid === BEGINNER_GRID || first)) this.startTutorial();
     }
 
     onExit(): void {
@@ -215,7 +225,8 @@ export class GamePage extends BasePage {
     private onSwap(o: SwapOutcome, a: number, b: number): void {
         const gm = this.gm;
         gm.audio.play('swap', 0.6);
-        if (o.newlyCorrectCells.length) {
+        // 地狱模式：拼对没有任何提示（无音效、无震动、无闪光），只有全部拼完才结算
+        if (o.newlyCorrectCells.length && !this.hell) {
             this.scheduleCall(0.14, () => gm.audio.play('correct', 0.7));
             gm.vibrate();
             for (const c of o.newlyCorrectCells) {
@@ -232,6 +243,10 @@ export class GamePage extends BasePage {
     private useHint(): void {
         const gm = this.gm;
         if (!this.pm || this.pm.finished || this.tutLocked()) return;
+        if (!this.pm.hintsEnabled) {
+            this.sm.toast('地狱模式没有提示，靠自己吧');
+            return;
+        }
         if (this.pm.hintsLeft <= 0) {
             if (gm.ads.isRewardedAvailable()) {
                 this.sm.confirm('提示用完啦', '观看一段激励视频，可获得 1 次额外提示（不看也不影响继续游戏）。', [
@@ -304,7 +319,8 @@ export class GamePage extends BasePage {
         const card = this.sm.openModal(w, h, { closeOnMask: false, onClose: () => this.resumeFromPause() });
         const t = label(card, '休息一下', Theme.font.title, { bold: true });
         t.node.setPosition(0, h / 2 - 70);
-        const info = label(card, `已用时 ${formatDuration(this.pm.timer.elapsedMs)} · ${this.pm.moves} 步\n计时已暂停`, Theme.font.small, { color: P.ink2, width: w - 60, wrap: true });
+        const infoText = this.hell ? '地狱模式不限时、不限步\n拼完才结算' : `已用时 ${formatDuration(this.pm.timer.elapsedMs)} · ${this.pm.moves} 步\n计时已暂停`;
+        const info = label(card, infoText, Theme.font.small, { color: P.ink2, width: w - 60, wrap: true });
         info.node.setPosition(0, h / 2 - 140);
         button(card, { w: w - 100, h: 96, text: '继续拼图', style: 'primary', icon: this.gm.textures.icon('play', P.white), onClick: () => this.sm.closeModal() }, 0, 10);
         button(card, { w: w - 100, h: 88, text: '重新开始', style: 'secondary', icon: this.gm.textures.icon('refresh', P.ink), onClick: () => this.restart() }, 0, -100);
@@ -327,7 +343,7 @@ export class GamePage extends BasePage {
         const s = this.session;
         this.board.clear();
         // 经典模式重新打乱；每日/挑战模式必须保持同一道题
-        const spec = s.mode === 'classic' ? { ...s.spec, seed: (Math.random() * 0xffffffff) >>> 0 } : s.spec;
+        const spec = s.mode === 'classic' || s.mode === 'hell' ? { ...s.spec, seed: (Math.random() * 0xffffffff) >>> 0 } : s.spec;
         this.onEnter({ ...s, spec });
     }
 
@@ -373,6 +389,17 @@ export class GamePage extends BasePage {
     private refreshHud(full: boolean): void {
         const pm = this.pm;
         if (!pm) return;
+        if (this.hell) {
+            // 不显示时间、步数和任何限制；成绩在结算页一次性给出
+            this.timeLabel.string = '不限时';
+            this.movesLabel.string = '不限步数';
+            this.goalLabel.string = '拼完再结算';
+            if (full) {
+                this.hintBtn.setText('无提示');
+                this.undoBtn.setEnabled(pm.canUndo);
+            }
+            return;
+        }
         const ms = pm.timer.elapsedMs;
         this.timeLabel.string = formatDuration(ms);
         // “显示剩余时间”：距离三星时间上限还剩多少

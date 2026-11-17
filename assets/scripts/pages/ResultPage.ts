@@ -1,9 +1,11 @@
 import { Node, tween, Vec3 } from 'cc';
 import { ART_LIST } from '../art/ArtCatalog';
 import { P } from '../art/Palette';
-import { DIFFICULTIES } from '../config/GameConfig';
+import { DIFFICULTIES, HELL } from '../config/GameConfig';
 import { formatDuration } from '../core/GameTimer';
 import { ResultPayload } from '../core/GameManager';
+import { recordHellResult } from '../collection/HellRecords';
+import { PuzzleResult } from '../puzzle/PuzzleScoring';
 import { DailyUpdate } from '../daily/DailyChallengeManager';
 import { ChallengeComparison } from '../social/ChallengeManager';
 import { ChallengeData } from '../social/ChallengeCodec';
@@ -37,6 +39,10 @@ export class ResultPage extends BasePage {
         const gm = this.gm;
         const { session, result } = payload;
         this.content.destroyAllChildren();
+        if (session.mode === 'hell') {
+            this.buildHell(result);
+            return;
+        }
 
         // 写入存档（收藏/纪录/每日/挑战）
         const rec = gm.collection.recordResult(result);
@@ -218,6 +224,70 @@ export class ResultPage extends BasePage {
             button(c, { w: bw, h: 92, text: '返回首页', style: 'mint', onClick: () => this.backHome() }, bw / 2 + 10, btnY);
         }
         // 左上角“回首页”小按钮（不抢主按钮的位置）
+        button(c, { w: 84, h: 72, style: 'white', icon: gm.textures.icon('back', P.ink), iconSize: 30, onClick: () => this.backHome() }, -L.w / 2 + Theme.gutter + 42, L.headerY);
+    }
+
+    /**
+     * 地狱模式结算：不评星、不计入普通纪录/收藏/经验，只记地狱模式自己的最佳成绩和通关次数。
+     * 这是本局第一次看到用时和步数（游戏中不显示）。
+     */
+    private buildHell(result: PuzzleResult): void {
+        const gm = this.gm;
+        const L = this.L;
+        const c = this.content;
+        const W = L.w - Theme.gutter * 2;
+        const up = recordHellResult(gm.save.data, result, Date.now());
+        gm.save.flush();
+        const art = gm.resolveArt(result.imageId)!;
+
+        const title = label(c, up.firstClear ? '地狱首通！' : '地狱通关！', Theme.font.hero - 8, { bold: true, color: P.white, outline: { color: P.night2, width: 6 } });
+        title.node.setPosition(0, L.headerY - 6);
+        label(c, `${art.name} · ${HELL.label} ${HELL.grid}×${HELL.grid}`, Theme.font.small, { color: P.ink2, bold: true }).node.setPosition(0, L.headerY - 64);
+
+        const btnY = -L.h / 2 + L.safeBottom + 24 + 50;
+        const statsH = 260;
+        const avail = L.headerY - 110 - (btnY + 46) - statsH - 120;
+        const artSize = Math.max(140, Math.min(360, avail));
+        const artY = L.headerY - 110 - Math.max(0, (avail - artSize) * 0.4) - artSize / 2;
+        const frame = artFrame(c, gm.textures.art(art.id), artSize, 0, artY, art.tint);
+        frame.setScale(0.6, 0.6, 1);
+        tween(frame).to(0.35, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' }).start();
+        const badge = panel(c, 150, 52, { fill: P.night2, border: P.ink, shadow: P.rose2, step: Theme.px }, artSize / 2 - 40, artY + artSize / 2 - 4);
+        sprite(badge, gm.textures.icon('flame', P.rose, P.gold), 26, 26, -44, 0);
+        label(badge, HELL.label, Theme.font.small, { bold: true, color: P.white }).node.setPosition(14, 0);
+        badge.angle = 6;
+        popIn(badge, 0.5);
+
+        const statsY = artY - artSize / 2 - 60 - statsH / 2;
+        const stats = panel(c, W, statsH, { fill: P.white, border: P.ink, shadow: P.ink, step: Theme.px, shadowDepth: 2 }, 0, statsY);
+        const best = up.record;
+        const rows: Array<[string, string, string, number]> = [
+            ['clock', '用时', formatDuration(result.timeMs), P.blue3],
+            ['steps', '步数', `${result.moves} 步（最少 ${result.optimalMoves} 步）`, P.leaf3],
+            ['trophy', '最佳', `${formatDuration(best.bestTimeMs)} · ${best.bestMoves} 步`, P.rose2],
+            ['flame', '通关', `第 ${best.clears} 次`, P.rose],
+        ];
+        rows.forEach(([icon, k, v, col], i) => {
+            const y = statsH / 2 - 44 - i * 56;
+            sprite(stats, gm.textures.icon(icon, col, P.white), 28, 28, -W / 2 + 46, y);
+            label(stats, k, Theme.font.small, { color: Theme.textMuted, align: 'left' }).node.setPosition(-W / 2 + 76, y);
+            label(stats, v, Theme.font.body, { bold: true, align: 'right' }).node.setPosition(W / 2 - 30, y);
+        });
+        if (up.isNewRecord) {
+            const nr = panel(c, 190, 56, { fill: P.rose, border: P.ink, step: Theme.px, shadow: P.rose2 }, W / 2 - 80, statsY + statsH / 2 + 6);
+            label(nr, '新纪录！', Theme.font.small, { bold: true, color: P.white });
+            nr.angle = 6;
+            popIn(nr, 0.9);
+        }
+        popIn(stats, 0.3);
+        tween(c).delay(0.6).call(() => {
+            this.fx.ring(0, artY, artSize * 0.7, 20);
+            this.fx.confetti(L.w, L.h / 2, -L.h / 2, 46);
+        }).start();
+
+        const bw = (W - 20) / 2;
+        button(c, { w: bw, h: 92, text: '再来一局', style: 'secondary', icon: gm.textures.icon('refresh', P.ink), onClick: () => Flow.hell(art.id) }, -bw / 2 - 10, btnY);
+        button(c, { w: bw, h: 92, text: '返回首页', style: 'primary', onClick: () => this.backHome() }, bw / 2 + 10, btnY);
         button(c, { w: 84, h: 72, style: 'white', icon: gm.textures.icon('back', P.ink), iconSize: 30, onClick: () => this.backHome() }, -L.w / 2 + Theme.gutter + 42, L.headerY);
     }
 

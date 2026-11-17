@@ -9,7 +9,7 @@
  * 新增字段时：提升 SAVE_VERSION，在 migrate() 中补默认值，绝不直接丢弃旧数据。
  */
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 export interface LevelRecord {
     bestTimeMs: number;
@@ -98,6 +98,16 @@ export interface AdState {
     transitions: number;
 }
 
+/** 地狱模式成绩（每张作品一条；与普通模式的 records/星级完全分开） */
+export interface HellRecord {
+    bestTimeMs: number;
+    bestMoves: number;
+    /** 通关次数 */
+    clears: number;
+    firstClearAt: number;
+    lastClearAt: number;
+}
+
 export interface Settings {
     music: boolean;
     sfx: boolean;
@@ -119,6 +129,8 @@ export interface SaveData {
     collected: Record<string, number>;
     /** daily[dateKey] */
     daily: Record<string, DailyRecord>;
+    /** 地狱模式成绩：imageId → 记录（v5 新增） */
+    hell: Record<string, HellRecord>;
     challenges: { sent: ChallengeLog[]; received: ChallengeLog[] };
     settings: Settings;
     tutorial: { puzzleBasics: boolean };
@@ -157,6 +169,7 @@ export function createDefaultSave(now: number): SaveData {
         records: {},
         collected: {},
         daily: {},
+        hell: {},
         challenges: { sent: [], received: [] },
         settings: { music: true, sfx: true, vibration: true },
         tutorial: { puzzleBasics: false },
@@ -260,6 +273,13 @@ export function migrate(raw: unknown, now: number): SaveData | null {
     if (isObj(data.records)) d.records = data.records;
     if (isObj(data.collected)) d.collected = data.collected;
     if (isObj(data.daily)) d.daily = data.daily;
+    if (isObj(data.hell)) {
+        for (const k of Object.keys(data.hell)) {
+            const r = data.hell[k];
+            if (!isObj(r) || typeof r.bestTimeMs !== 'number' || typeof r.bestMoves !== 'number') continue;
+            d.hell[k] = { bestTimeMs: r.bestTimeMs, bestMoves: r.bestMoves, clears: num(r.clears, 1), firstClearAt: num(r.firstClearAt, 0), lastClearAt: num(r.lastClearAt, 0) };
+        }
+    }
     if (isObj(data.challenges)) {
         d.challenges.sent = Array.isArray(data.challenges.sent) ? data.challenges.sent : [];
         d.challenges.received = Array.isArray(data.challenges.received) ? data.challenges.received : [];
