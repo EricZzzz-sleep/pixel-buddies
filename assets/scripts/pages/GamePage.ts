@@ -1,6 +1,6 @@
 import { BlockInputEvents, Graphics, Label, Node, Sprite, tween, Tween, UITransform, Vec3 } from 'cc';
 import { P } from '../art/Palette';
-import { DIFFICULTIES } from '../config/GameConfig';
+import { CHALLENGE, DIFFICULTIES } from '../config/GameConfig';
 import { formatDuration } from '../core/GameTimer';
 import { PlaySession, ResultPayload } from '../core/GameManager';
 import { PuzzleBoard } from '../puzzle/PuzzleBoard';
@@ -151,8 +151,11 @@ export class GamePage extends BasePage {
         this.finishing = false;
         this.lastShownSecond = -1;
         // 长得一模一样的方块不参与打乱，避免“看起来拼好了却没完成”
+        // 旧版本发出的好友挑战（v1）按旧规则打乱，保证和发起方是同一个局面
+        const legacy = !!session.challenge && session.challenge.version < CHALLENGE.identicalTilesFromVersion;
         const canvas = gm.textures.artCanvas(session.spec.imageId);
-        this.pm = new PuzzleManager(session.spec, undefined, identicalTileCells(canvas.data, canvas.w, session.spec.grid));
+        const fixed = legacy ? [] : identicalTileCells(canvas.data, canvas.w, session.spec.grid);
+        this.pm = new PuzzleManager(session.spec, undefined, fixed);
         this.board.start(this.pm);
         this.board.setEnabled(true);
         const art = this.gm.resolveArt(session.spec.imageId);

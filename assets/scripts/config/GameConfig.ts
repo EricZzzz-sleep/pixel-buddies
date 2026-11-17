@@ -133,8 +133,12 @@ export const DAILY = {
 };
 
 export const CHALLENGE = {
-    /** 挑战数据格式版本 */
-    version: 1,
+    /** 挑战数据格式版本。
+     *  v2：打乱时排除“长得一模一样”的方块（见 TileSignature）。旧版客户端收到 v2 会提示更新；
+     *  新版客户端收到 v1 链接时按旧规则打乱，保证和发起方是同一个局面。 */
+    version: 2,
+    /** 从这个版本起，打乱时排除长得一样的方块 */
+    identicalTilesFromVersion: 2,
     /** 校验盐值（仅用于完整性校验，非安全加密） */
     salt: 'pb-challenge-v1',
     /** 分享 query 中的键名 */

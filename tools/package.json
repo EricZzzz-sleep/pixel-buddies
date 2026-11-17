@@ -14,7 +14,9 @@
     "web:package": "node package-web.mjs",
     "web:deploy": "bash deploy-web.sh",
     "web:vercel": "bash deploy-vercel.sh",
-    "web:all": "npm run web:build && npm run web:package"
+    "web:all": "npm run web:build && npm run web:package",
+    "mini:check": "node mini-config.mjs wechatgame /tmp/pb-wx.json && node mini-config.mjs bytedance-mini-game /tmp/pb-tt.json",
+    "mini:release": "RELEASE=1 bash build-mini.sh wechatgame && RELEASE=1 bash build-mini.sh bytedance-mini-game"
   },
   "devDependencies": {
     "@cocos/creator-types": "^3.8.8",

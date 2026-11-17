@@ -214,3 +214,13 @@ test('分享管理：生成带挑战数据的 query，并记录已发出的挑�
     assert.deepEqual(cm.parseFromQuery(parseQueryString(got.query)), d);
     assert.equal(save.data.challenges.sent.length, 1);
 });
+
+test('挑战码 v2：仍能打开旧版 v1 链接；更新的版本提示更新', async () => {
+    const { encodeChallenge, decodeChallenge } = await import('../../assets/scripts/social/ChallengeCodec');
+    const { CHALLENGE } = await import('../../assets/scripts/config/GameConfig');
+    assert.equal(CHALLENGE.version, 2);
+    const v1 = decodeChallenge(encodeChallenge({ version: 1, imageId: 'cat_orange', grid: 4, seed: 7, fromTimeMs: 12300, fromMoves: 9 }));
+    assert.ok(v1.ok && v1.data.version === 1, 'v1 链接应能解析，并保留版本号用于按旧规则打乱');
+    const v3 = decodeChallenge(encodeChallenge({ version: 3, imageId: 'cat_orange', grid: 4, seed: 7, fromTimeMs: 0, fromMoves: 0 }));
+    assert.ok(!v3.ok && v3.error === 'version');
+});
