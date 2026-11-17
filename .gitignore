@@ -15,3 +15,6 @@ __pycache__/
 # 网页发布产物
 dist/
 .wrangler/
+
+# 发布用的 AppID、远程资源域名（复制 tools/release.env.example）
+tools/release.env

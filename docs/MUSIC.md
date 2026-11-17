@@ -94,9 +94,17 @@
 - `npm run web:vercel` 会同时构建网页版和两个小游戏，把 `build/<平台>/remote/` 复制到 `dist/mini/<平台>/remote/`，和网页一起部署到 Vercel。**每次部署都会带上**，否则已发布的小游戏会找不到音乐（只想发网页版可设 `MINI_PLATFORMS=` 跳过，但不要在小游戏已上线后这么做）。
 - 上传小游戏用的是同一次构建的 `build/wechatgame`、`build/bytedance-mini-game`，保证哈希和网站上的一致。
 
-**上线前必须做：**
-1. 微信公众平台 → 开发管理 → 服务器域名 → **downloadFile 合法域名** 加上 `https://pixel-buddies.vercel.app`；抖音开发者后台同样把它加入下载域名白名单。否则真机上主题曲会加载失败（游戏会自动改放主包里的保底音乐，不会崩溃）。
-2. `*.vercel.app` 在中国大陆的访问速度和稳定性需要真机实测。如果不理想，换成自己的域名（按平台要求完成备案和 HTTPS），再改上面两个构建配置里的 `server`。
+**上线前必须做（Vercel 只适合开发和体验版）：**
+
+微信、抖音要求 downloadFile 合法域名**必须完成 ICP 备案**，`*.vercel.app` 无法备案，所以正式版不能从 Vercel 加载主题曲（会全部失败，只剩主包里的保底音乐）。提审包要这样构建：
+
+1. 准备一个已备案的 https 域名放远程资源，推荐腾讯云 COS + 自定义域名（或微信云开发的云存储）。
+2. 复制 `tools/release.env.example` 为 `tools/release.env`（不会提交），填 `WX_APPID`、`TT_APPID`、`MINI_REMOTE_BASE`（例如 `https://cdn.你的域名.cn/pixel-buddies`）。
+3. `cd tools && npm run mini:release`：先做发布检查，AppID 是占位值或远程域名无法备案时会**直接拒绝构建**；通过后用临时配置构建，不改仓库里的构建配置。
+4. 把 `build/<平台>/remote/` 上传到 `<MINI_REMOTE_BASE>/mini/<平台>/remote/`（脚本最后会打印完整地址），再上传小游戏包。
+5. 在平台后台把这个域名加入 downloadFile 合法域名。
+
+随时可以用 `npm run mini:check` 看当前配置还差什么。不设 `RELEASE=1` 的普通构建只提示、不拦截，开发和体验版（开发者工具勾选“不校验合法域名”）照常使用 Vercel。
 
 ## 重新生成 / 修改
 
