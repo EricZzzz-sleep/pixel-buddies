@@ -132,6 +132,17 @@ export const DAILY = {
     salt: 'pixel-buddies-daily-v1',
 };
 
+/**
+ * 地狱模式：5×5，所有可打乱的方块全部打乱（不是两两互换）；
+ * 拼对没有音效/震动/进度提示，拼对的方块也能再拖走，没有提示，不显示时间和步数限制，拼完才结算。
+ * 成绩单独记录，不影响普通模式的星级和收藏。
+ */
+export const HELL = {
+    grid: 5 as GridSize,
+    label: '地狱',
+    desc: '全部打乱 · 无提示 · 不锁定',
+};
+
 export const CHALLENGE = {
     /** 挑战数据格式版本。
      *  v2：打乱时排除“长得一模一样”的方块（见 TileSignature）。旧版客户端收到 v2 会提示更新；

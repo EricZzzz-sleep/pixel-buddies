@@ -9,8 +9,26 @@
  * @returns 至少与另一个格子像素完全相同的格子索引（升序）
  */
 export function identicalTileCells(rgba: ArrayLike<number>, size: number, grid: number): number[] {
+    const looks = tileLooks(rgba, size, grid);
+    const count = new Map<number, number>();
+    looks.forEach((l) => count.set(l, (count.get(l) || 0) + 1));
+    const out: number[] = [];
+    looks.forEach((l, cell) => {
+        if ((count.get(l) || 0) > 1) out.push(cell);
+    });
+    return out;
+}
+
+/**
+ * 每个格子的“长相编号”：像素完全相同的格子编号相同（取组内最小的格子索引）。
+ * 地狱模式拼对的方块不锁定，玩家可能把两块一模一样的方块互换——按长相判断是否拼好，就不会卡住。
+ */
+export function tileLooks(rgba: ArrayLike<number>, size: number, grid: number): number[] {
+    const n = grid * grid;
     const s = Math.floor(size / grid);
-    if (s <= 0 || rgba.length < size * size * 4) return [];
+    const plain: number[] = [];
+    for (let i = 0; i < n; i++) plain.push(i);
+    if (s <= 0 || rgba.length < size * size * 4) return plain;
     const groups = new Map<string, number[]>();
     for (let r = 0; r < grid; r++) {
         for (let c = 0; c < grid; c++) {
@@ -26,9 +44,9 @@ export function identicalTileCells(rgba: ArrayLike<number>, size: number, grid: 
             else groups.set(key, [cell]);
         }
     }
-    const out: number[] = [];
+    const looks = plain.slice();
     groups.forEach((cells) => {
-        if (cells.length > 1) out.push(...cells);
+        for (const c of cells) looks[c] = cells[0];
     });
-    return out.sort((a, b) => a - b);
+    return looks;
 }

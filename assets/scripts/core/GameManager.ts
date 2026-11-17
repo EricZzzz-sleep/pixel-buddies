@@ -43,7 +43,7 @@ export interface Layout {
     contentTop: number;
 }
 
-export type PlayMode = 'classic' | 'daily' | 'challenge-create' | 'challenge-accept';
+export type PlayMode = 'classic' | 'daily' | 'challenge-create' | 'challenge-accept' | 'hell';
 
 /** 一局游戏的上下文：由入口页面创建，传给游戏页和结算页 */
 export interface PlaySession {
